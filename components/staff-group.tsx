@@ -8,16 +8,16 @@ import { StaffMember } from '@/lib/storage'
 interface StaffGroupProps {
   title: string
   members: StaffMember[]
-  groupType: 'provider' | 'non-clinical' | 'other'
+  groupType: 'provider' | 'non-clinical' | 'clinical'
 }
 
 export function StaffGroup({ title, members, groupType }: StaffGroupProps) {
   const [isOpen, setIsOpen] = useState(true)
 
   const schedulePillClass =
-    groupType === 'non-clinical'
-      ? 'bg-blue-100 text-blue-900'
-      : 'bg-gray-100 text-gray-900'
+    groupType === 'provider'
+      ? 'bg-gray-100 text-gray-900'
+      : 'bg-blue-100 text-blue-900'
 
   if (members.length === 0) return null
 
@@ -32,6 +32,8 @@ export function StaffGroup({ title, members, groupType }: StaffGroupProps) {
           <ChevronDown className="h-5 w-5 text-gray-600" />
         )}
       </CollapsibleTrigger>
+      {/* Divider below header */}
+      <div className="h-px bg-gray-200" />
 
       <CollapsibleContent>
         <div className="divide-y divide-gray-200">

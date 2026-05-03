@@ -3,7 +3,7 @@ export interface StaffMember {
   id: string
   name: string
   title: string
-  type: 'provider' | 'non-clinical' | 'other'
+  type: 'provider' | 'non-clinical' | 'clinical'
   hoursPerWeek?: number
   schedule: string
   location?: string
@@ -75,12 +75,12 @@ const defaultStaff: StaffMember[] = [
     schedule: '7:00 AM - 3:00 PM',
     location: '1st Floor',
   },
-  // Other staff
+  // Clinical staff
   {
     id: '7',
     name: 'Alice Robert',
     title: 'Maintenance Technician',
-    type: 'other',
+    type: 'clinical',
     hoursPerWeek: 8,
     schedule: '8:00 AM - 4:00 PM',
     location: '2nd Floor',
@@ -89,7 +89,7 @@ const defaultStaff: StaffMember[] = [
     id: '8',
     name: 'Bob Wilson',
     title: 'Security Officer',
-    type: 'other',
+    type: 'clinical',
     hoursPerWeek: 12,
     schedule: '6:00 AM - 6:00 PM',
     location: '1st Floor',
