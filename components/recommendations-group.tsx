@@ -50,9 +50,10 @@ export function RecommendationsGroup({ recommendations }: RecommendationsGroupPr
                 {rec.slots.map((slot, i) => (
                   <div
                     key={i}
-                    className="w-full rounded-lg bg-red-100 px-3 py-2.5 text-center text-sm font-medium text-red-800"
+                    className="w-full rounded-lg bg-red-100 px-3 py-2.5 text-center"
                   >
-                    {slot}
+                    <p className="text-sm font-medium text-red-800">{slot}</p>
+                    <p className="text-xs text-red-700">{rec.need}</p>
                   </div>
                 ))}
               </div>
