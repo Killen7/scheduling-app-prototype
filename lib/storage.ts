@@ -10,23 +10,23 @@ export interface Recommendation {
 
 const recommendations: Recommendation[] = [
   // 1st Floor
-  { id: 'r1',  role: 'Medical Assistant',       need: 'Necesitas 1-2 personas', slots: ['8:00 AM - 4:00 PM'],                   location: '1st Floor', date: '2026-05-04' },
-  { id: 'r2',  role: 'Registered Nurse',        need: 'Necesitas 2-3 personas', slots: ['7:00 AM - 3:00 PM', '3:00 PM - 11:00 PM'], location: '1st Floor', date: '2026-05-05' },
-  { id: 'r3',  role: 'Patient Care Technician', need: 'Necesitas 1 persona',    slots: ['12:00 PM - 8:00 PM'],                  location: '1st Floor', date: '2026-05-06' },
-  { id: 'r4',  role: 'Medical Assistant',       need: 'Necesitas 1-2 personas', slots: ['9:00 AM - 5:00 PM'],                   location: '1st Floor', date: '2026-05-07' },
-  { id: 'r5',  role: 'Registered Nurse',        need: 'Necesitas 1-3 personas', slots: ['8:00 AM - 4:00 PM', '4:00 PM - 12:00 AM'], location: '1st Floor', date: '2026-05-08' },
+  { id: 'r1',  role: 'Medical Assistant',       need: 'You need 2 persons', slots: ['8:00 AM - 4:00 PM'],                   location: '1st Floor', date: '2026-05-04' },
+  { id: 'r2',  role: 'Registered Nurse',        need: 'You need 3 persons', slots: ['7:00 AM - 3:00 PM', '3:00 PM - 11:00 PM'], location: '1st Floor', date: '2026-05-05' },
+  { id: 'r3',  role: 'Patient Care Technician', need: 'You need 1 person',  slots: ['12:00 PM - 8:00 PM'],                  location: '1st Floor', date: '2026-05-06' },
+  { id: 'r4',  role: 'Medical Assistant',       need: 'You need 2 persons', slots: ['9:00 AM - 5:00 PM'],                   location: '1st Floor', date: '2026-05-07' },
+  { id: 'r5',  role: 'Registered Nurse',        need: 'You need 3 persons', slots: ['8:00 AM - 4:00 PM', '4:00 PM - 12:00 AM'], location: '1st Floor', date: '2026-05-08' },
   // 2nd Floor
-  { id: 'r6',  role: 'Dental Hygienist',        need: 'Necesitas 1-2 personas', slots: ['8:00 AM - 12:00 PM'],                  location: '2nd Floor', date: '2026-05-04' },
-  { id: 'r7',  role: 'Medical Assistant',       need: 'Necesitas 2 personas',   slots: ['9:00 AM - 5:00 PM'],                   location: '2nd Floor', date: '2026-05-05' },
-  { id: 'r8',  role: 'Phlebotomist',            need: 'Necesitas 1-3 personas', slots: ['7:00 AM - 3:00 PM', '11:00 AM - 7:00 PM'], location: '2nd Floor', date: '2026-05-06' },
-  { id: 'r9',  role: 'Dental Hygienist',        need: 'Necesitas 1 persona',    slots: ['10:00 AM - 2:00 PM'],                  location: '2nd Floor', date: '2026-05-07' },
-  { id: 'r10', role: 'Medical Assistant',       need: 'Necesitas 1-2 personas', slots: ['8:00 AM - 4:00 PM'],                   location: '2nd Floor', date: '2026-05-08' },
+  { id: 'r6',  role: 'Dental Hygienist',        need: 'You need 1 person',  slots: ['8:00 AM - 12:00 PM'],                  location: '2nd Floor', date: '2026-05-04' },
+  { id: 'r7',  role: 'Medical Assistant',       need: 'You need 2 persons', slots: ['9:00 AM - 5:00 PM'],                   location: '2nd Floor', date: '2026-05-05' },
+  { id: 'r8',  role: 'Phlebotomist',            need: 'You need 3 persons', slots: ['7:00 AM - 3:00 PM', '11:00 AM - 7:00 PM'], location: '2nd Floor', date: '2026-05-06' },
+  { id: 'r9',  role: 'Dental Hygienist',        need: 'You need 1 person',  slots: ['10:00 AM - 2:00 PM'],                  location: '2nd Floor', date: '2026-05-07' },
+  { id: 'r10', role: 'Medical Assistant',       need: 'You need 2 persons', slots: ['8:00 AM - 4:00 PM'],                   location: '2nd Floor', date: '2026-05-08' },
   // 3rd Floor
-  { id: 'r11', role: 'Surgical Technologist',   need: 'Necesitas 2-3 personas', slots: ['6:00 AM - 2:00 PM', '2:00 PM - 10:00 PM'], location: '3rd Floor', date: '2026-05-04' },
-  { id: 'r12', role: 'Radiologic Tech',         need: 'Necesitas 1 persona',    slots: ['8:00 AM - 4:00 PM'],                   location: '3rd Floor', date: '2026-05-05' },
-  { id: 'r13', role: 'Surgical Technologist',   need: 'Necesitas 1-2 personas', slots: ['7:00 AM - 3:00 PM'],                   location: '3rd Floor', date: '2026-05-06' },
-  { id: 'r14', role: 'Respiratory Therapist',   need: 'Necesitas 1-3 personas', slots: ['9:00 AM - 5:00 PM', '5:00 PM - 1:00 AM'], location: '3rd Floor', date: '2026-05-07' },
-  { id: 'r15', role: 'Radiologic Tech',         need: 'Necesitas 2 personas',   slots: ['8:00 AM - 4:00 PM'],                   location: '3rd Floor', date: '2026-05-08' },
+  { id: 'r11', role: 'Surgical Technologist',   need: 'You need 2 persons', slots: ['6:00 AM - 2:00 PM', '2:00 PM - 10:00 PM'], location: '3rd Floor', date: '2026-05-04' },
+  { id: 'r12', role: 'Radiologic Tech',         need: 'You need 1 person',  slots: ['8:00 AM - 4:00 PM'],                   location: '3rd Floor', date: '2026-05-05' },
+  { id: 'r13', role: 'Surgical Technologist',   need: 'You need 2 persons', slots: ['7:00 AM - 3:00 PM'],                   location: '3rd Floor', date: '2026-05-06' },
+  { id: 'r14', role: 'Respiratory Therapist',   need: 'You need 3 persons', slots: ['9:00 AM - 5:00 PM', '5:00 PM - 1:00 AM'], location: '3rd Floor', date: '2026-05-07' },
+  { id: 'r15', role: 'Radiologic Tech',         need: 'You need 2 persons', slots: ['8:00 AM - 4:00 PM'],                   location: '3rd Floor', date: '2026-05-08' },
 ]
 
 const RECOMMENDATIONS_KEY = 'teambuilder_recommendations_v1'
