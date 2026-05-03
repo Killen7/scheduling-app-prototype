@@ -1,6 +1,6 @@
 'use client'
 
-import { Calendar as CalendarIcon } from 'lucide-react'
+import { CalendarIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import {
@@ -16,81 +16,75 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import { format } from 'date-fns'
-import type { Location } from '@/lib/storage'
 
 interface FiltersProps {
-  locations: Location[]
-  selectedLocation: string
-  onLocationChange: (location: string) => void
-  selectedDate: Date
-  onDateChange: (date: Date) => void
-  filterBy: string
-  onFilterByChange: (filter: string) => void
+  selectedFloor: string
+  onFloorChange: (floor: string) => void
+  selectedDate: string
+  onDateChange: (date: string) => void
+  selectedFilter: string
+  onFilterChange: (filter: string) => void
 }
 
+const FLOORS = ['1st Floor', '2nd Floor', '3rd Floor']
+
 export function Filters({
-  locations,
-  selectedLocation,
-  onLocationChange,
+  selectedFloor,
+  onFloorChange,
   selectedDate,
   onDateChange,
-  filterBy,
-  onFilterByChange,
+  selectedFilter,
+  onFilterChange,
 }: FiltersProps) {
   return (
-    <div className="flex flex-col gap-3 p-4">
+    <div className="flex flex-col gap-3 border-b bg-white px-4 py-4">
       <div className="flex gap-3">
-        {/* Location Select */}
-        <Select value={selectedLocation} onValueChange={onLocationChange}>
-          <SelectTrigger className="flex-1">
-            <SelectValue placeholder="Select location" />
+        {/* Floor Select */}
+        <Select value={selectedFloor} onValueChange={onFloorChange}>
+          <SelectTrigger className="flex-1 rounded-lg border border-gray-300">
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Locations</SelectItem>
-            {locations.map((location) => (
-              <SelectItem key={location.id} value={location.id}>
-                {location.name}
+            {FLOORS.map((floor) => (
+              <SelectItem key={floor} value={floor}>
+                {floor}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
 
         {/* Date Picker */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn(
-                'flex-1 justify-start text-left font-normal',
-                !selectedDate && 'text-muted-foreground'
-              )}
-            >
-              <span className="truncate">{format(selectedDate, 'MM/dd/yyyy')}</span>
-              <CalendarIcon className="ml-auto size-4 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={(date) => date && onDateChange(date)}
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
+        <Button
+          variant="outline"
+          className={cn(
+            'flex-1 justify-start rounded-lg border border-gray-300 text-left font-normal'
+          )}
+          onClick={(e) => {
+            const input = document.createElement('input')
+            input.type = 'date'
+            input.value = selectedDate
+            input.onchange = (event) => {
+              const target = event.target as HTMLInputElement
+              onDateChange(target.value)
+            }
+            input.click()
+          }}
+        >
+          <span>{selectedDate}</span>
+          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+        </Button>
       </div>
 
       {/* Filter By */}
-      <Select value={filterBy} onValueChange={onFilterByChange}>
-        <SelectTrigger className="w-full">
+      <Select value={selectedFilter} onValueChange={onFilterChange}>
+        <SelectTrigger className="w-full rounded-lg border border-gray-300">
           <SelectValue placeholder="Filter by" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Staff</SelectItem>
+          <SelectItem value="">All Staff</SelectItem>
+          <SelectItem value="available">Available Today</SelectItem>
           <SelectItem value="providers">Providers Only</SelectItem>
           <SelectItem value="non-clinical">Non-Clinical Only</SelectItem>
-          <SelectItem value="other">Other Staff Only</SelectItem>
         </SelectContent>
       </Select>
     </div>

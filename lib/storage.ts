@@ -2,14 +2,11 @@
 export interface StaffMember {
   id: string
   name: string
-  role: string
-  category: 'providers' | 'non-clinical' | 'other'
-  hours?: number
-  schedule: {
-    startTime: string
-    endTime: string
-  }
-  location: string
+  title: string
+  type: 'provider' | 'non-clinical' | 'other'
+  hoursPerWeek?: number
+  schedule: string
+  location?: string
 }
 
 export interface Location {
@@ -29,80 +26,80 @@ const defaultStaff: StaffMember[] = [
   {
     id: '1',
     name: 'Andersons, Adam',
-    role: 'Doctor of Osteopathic Medicine',
-    category: 'providers',
-    schedule: { startTime: '8:00 AM', endTime: '4:00 PM' },
-    location: '2',
+    title: 'Doctor of Osteopathic Medicine',
+    type: 'provider',
+    schedule: '8:00 AM - 4:00 PM',
+    location: '2nd Floor',
   },
   {
     id: '2',
     name: 'Finch, Aaron',
-    role: 'Doctor of Dental Surgery',
-    category: 'providers',
-    schedule: { startTime: '8:00 AM', endTime: '4:00 PM' },
-    location: '2',
+    title: 'Doctor of Dental Surgery',
+    type: 'provider',
+    schedule: '8:00 AM - 4:00 PM',
+    location: '2nd Floor',
   },
   {
     id: '3',
     name: 'Martinez, Sofia',
-    role: 'Physician Assistant',
-    category: 'providers',
-    schedule: { startTime: '9:00 AM', endTime: '5:00 PM' },
-    location: '1',
+    title: 'Physician Assistant',
+    type: 'provider',
+    schedule: '9:00 AM - 5:00 PM',
+    location: '1st Floor',
   },
   // Non-clinical staff
   {
     id: '4',
     name: 'Adam Markam',
-    role: 'Admin Assistant',
-    category: 'non-clinical',
-    hours: 22.7,
-    schedule: { startTime: '8:00 AM', endTime: '4:00 PM' },
-    location: '2',
+    title: 'Admin Assistant',
+    type: 'non-clinical',
+    hoursPerWeek: 22.7,
+    schedule: '8:00 AM - 4:00 PM',
+    location: '2nd Floor',
   },
   {
     id: '5',
     name: 'Adnan Clinical',
-    role: 'Clinical Research Assistant',
-    category: 'non-clinical',
-    hours: 11.5,
-    schedule: { startTime: '8:00 AM', endTime: '4:00 PM' },
-    location: '2',
+    title: 'Clinical Research Assistant',
+    type: 'non-clinical',
+    hoursPerWeek: 11.5,
+    schedule: '8:00 AM - 4:00 PM',
+    location: '2nd Floor',
   },
   {
     id: '6',
     name: 'Sarah Johnson',
-    role: 'Medical Secretary',
-    category: 'non-clinical',
-    hours: 40,
-    schedule: { startTime: '7:00 AM', endTime: '3:00 PM' },
-    location: '1',
+    title: 'Medical Secretary',
+    type: 'non-clinical',
+    hoursPerWeek: 40,
+    schedule: '7:00 AM - 3:00 PM',
+    location: '1st Floor',
   },
   // Other staff
   {
     id: '7',
     name: 'Alice Robert',
-    role: 'Maintenance Technician',
-    category: 'other',
-    hours: 8,
-    schedule: { startTime: '8:00 AM', endTime: '4:00 PM' },
-    location: '2',
+    title: 'Maintenance Technician',
+    type: 'other',
+    hoursPerWeek: 8,
+    schedule: '8:00 AM - 4:00 PM',
+    location: '2nd Floor',
   },
   {
     id: '8',
     name: 'Bob Wilson',
-    role: 'Security Officer',
-    category: 'other',
-    hours: 12,
-    schedule: { startTime: '6:00 AM', endTime: '6:00 PM' },
-    location: '1',
+    title: 'Security Officer',
+    type: 'other',
+    hoursPerWeek: 12,
+    schedule: '6:00 AM - 6:00 PM',
+    location: '1st Floor',
   },
 ]
 
 const STAFF_KEY = 'teambuilder_staff'
 const LOCATIONS_KEY = 'teambuilder_locations'
 
-export function getStaff(): StaffMember[] {
+export function loadStaff(): StaffMember[] {
   if (typeof window === 'undefined') return defaultStaff
   
   const stored = localStorage.getItem(STAFF_KEY)
@@ -135,7 +132,7 @@ export function saveLocations(locations: Location[]): void {
 }
 
 export function addStaffMember(member: Omit<StaffMember, 'id'>): StaffMember {
-  const staff = getStaff()
+  const staff = loadStaff()
   const newMember = { ...member, id: Date.now().toString() }
   staff.push(newMember)
   saveStaff(staff)
@@ -143,7 +140,7 @@ export function addStaffMember(member: Omit<StaffMember, 'id'>): StaffMember {
 }
 
 export function updateStaffMember(id: string, updates: Partial<StaffMember>): void {
-  const staff = getStaff()
+  const staff = loadStaff()
   const index = staff.findIndex(m => m.id === id)
   if (index !== -1) {
     staff[index] = { ...staff[index], ...updates }
@@ -152,7 +149,7 @@ export function updateStaffMember(id: string, updates: Partial<StaffMember>): vo
 }
 
 export function deleteStaffMember(id: string): void {
-  const staff = getStaff()
+  const staff = loadStaff()
   const filtered = staff.filter(m => m.id !== id)
   saveStaff(filtered)
 }
