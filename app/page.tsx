@@ -4,13 +4,13 @@ import { useEffect, useState } from 'react'
 import { Header } from '@/components/header'
 import { Filters } from '@/components/filters'
 import { StaffGroup } from '@/components/staff-group'
-import { loadStaff, saveStaff, StaffMember } from '@/lib/storage'
+import { loadStaff, StaffMember } from '@/lib/storage'
 import { Plus } from 'lucide-react'
 
 export default function Home() {
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [selectedFloor, setSelectedFloor] = useState('2nd Floor')
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [selectedDate, setSelectedDate] = useState('2026-05-04')
   const [selectedFilter, setSelectedFilter] = useState<string>('all')
 
   useEffect(() => {
@@ -18,21 +18,18 @@ export default function Home() {
     setStaff(loadedStaff)
   }, [])
 
-  useEffect(() => {
-    saveStaff(staff)
-  }, [staff])
+  // Filter by floor + date first, then by staff type
+  const byFloorAndDate = staff.filter(
+    (s) => s.location === selectedFloor && s.date === selectedDate
+  )
 
-  const providers = staff.filter((s) => s.type === 'provider')
-  const nonClinical = staff.filter((s) => s.type === 'non-clinical')
-  const clinical = staff.filter((s) => s.type === 'clinical')
+  const providers = byFloorAndDate.filter((s) => s.type === 'provider')
+  const nonClinical = byFloorAndDate.filter((s) => s.type === 'non-clinical')
+  const clinical = byFloorAndDate.filter((s) => s.type === 'clinical')
 
-  const filteredStaff = (members: StaffMember[]) => {
-    if (selectedFilter === 'all' || !selectedFilter) return members
-    if (selectedFilter === 'available') {
-      return members.filter((m) => m.schedule.includes('AM') || m.schedule.includes('PM'))
-    }
-    return members
-  }
+  const visibleProviders   = selectedFilter === 'all' || selectedFilter === 'providers'    ? providers   : []
+  const visibleNonClinical = selectedFilter === 'all' || selectedFilter === 'non-clinical' ? nonClinical : []
+  const visibleClinical    = selectedFilter === 'all' || selectedFilter === 'clinical'     ? clinical    : []
 
   return (
     <div className="min-h-screen bg-white">
@@ -49,17 +46,9 @@ export default function Home() {
         />
 
         <div className="space-y-0">
-          <StaffGroup
-            title="PROVIDERS"
-            members={filteredStaff(providers)}
-            groupType="provider"
-          />
-          <StaffGroup
-            title="NON-CLINICAL STAFF"
-            members={filteredStaff(nonClinical)}
-            groupType="non-clinical"
-          />
-          <StaffGroup title="CLINICAL STAFF" members={filteredStaff(clinical)} groupType="clinical" />
+          <StaffGroup title="PROVIDERS"        members={visibleProviders}   groupType="provider"      />
+          <StaffGroup title="NON-CLINICAL STAFF" members={visibleNonClinical} groupType="non-clinical"  />
+          <StaffGroup title="CLINICAL STAFF"  members={visibleClinical}    groupType="clinical"     />
         </div>
       </main>
 
