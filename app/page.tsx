@@ -4,19 +4,25 @@ import { useEffect, useState } from 'react'
 import { Header } from '@/components/header'
 import { Filters } from '@/components/filters'
 import { StaffGroup } from '@/components/staff-group'
-import { loadStaff, StaffMember } from '@/lib/storage'
+import { loadStaff, loadRecommendations, StaffMember, Recommendation } from '@/lib/storage'
+import { RecommendationsGroup } from '@/components/recommendations-group'
 import { Plus } from 'lucide-react'
 
 export default function Home() {
   const [staff, setStaff] = useState<StaffMember[]>([])
+  const [allRecommendations, setAllRecommendations] = useState<Recommendation[]>([])
   const [selectedFloor, setSelectedFloor] = useState('2nd Floor')
   const [selectedDate, setSelectedDate] = useState('2026-05-04')
   const [selectedFilter, setSelectedFilter] = useState<string>('all')
 
   useEffect(() => {
-    const loadedStaff = loadStaff()
-    setStaff(loadedStaff)
+    setStaff(loadStaff())
+    setAllRecommendations(loadRecommendations())
   }, [])
+
+  const recommendations = allRecommendations.filter(
+    (r) => r.location === selectedFloor && r.date === selectedDate
+  )
 
   // Filter by floor + date first, then by staff type
   const byFloorAndDate = staff.filter(
@@ -46,6 +52,7 @@ export default function Home() {
         />
 
         <div className="space-y-0">
+          <RecommendationsGroup recommendations={recommendations} />
           <StaffGroup title="PROVIDERS"        members={visibleProviders}   groupType="provider"      />
           <StaffGroup title="NON-CLINICAL STAFF" members={visibleNonClinical} groupType="non-clinical"  />
           <StaffGroup title="CLINICAL STAFF"  members={visibleClinical}    groupType="clinical"     />
