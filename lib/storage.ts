@@ -29,7 +29,7 @@ const recommendations: Recommendation[] = [
   { id: 'r15', role: 'Radiologic Tech',         need: 'You need 2 persons', slots: ['8:00 AM - 4:00 PM'],                   location: '3rd Floor', date: '2026-05-08' },
 ]
 
-const RECOMMENDATIONS_KEY = 'teambuilder_recommendations_v1'
+const RECOMMENDATIONS_KEY = 'teambuilder_recommendations_v2'
 
 export function loadRecommendations(): Recommendation[] {
   if (typeof window === 'undefined') return recommendations
