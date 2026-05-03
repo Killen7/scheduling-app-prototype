@@ -48,7 +48,7 @@ export default function Home() {
           onFilterChange={setSelectedFilter}
         />
 
-        <div className="mt-6 space-y-0">
+        <div className="space-y-0">
           <StaffGroup
             title="PROVIDERS"
             members={filteredStaff(providers)}
