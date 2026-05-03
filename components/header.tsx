@@ -49,11 +49,7 @@ export function Header({ onMenuClick }: HeaderProps) {
       </Sheet>
 
       <div className="flex items-center gap-1">
-        <span className="text-xl font-bold tracking-tight">
-          <span className="text-primary">[:</span>
-          <span className="text-foreground">TeamBuilder</span>
-          <span className="text-muted-foreground text-sm align-super">™</span>
-        </span>
+        <span className="text-lg font-bold tracking-tight text-primary">TeamBuilderAI</span>
       </div>
 
       <Button variant="ghost" size="icon">
