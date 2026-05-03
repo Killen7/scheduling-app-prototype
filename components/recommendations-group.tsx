@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronDown, ChevronUp, User } from 'lucide-react'
 import { useState } from 'react'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import type { Recommendation } from '@/lib/storage'
@@ -32,12 +32,12 @@ export function RecommendationsGroup({ recommendations }: RecommendationsGroupPr
 
       <CollapsibleContent>
         <div className="divide-y divide-gray-200">
-          {recommendations.map((rec) => (
-            <div key={rec.id} className="flex items-stretch border-b border-gray-200">
-              {/* Left column: role + need label */}
-              <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 px-4 py-4">
-                <p className="truncate text-sm font-medium text-gray-900">{rec.role}</p>
-                <p className="truncate text-xs text-red-500">{rec.need}</p>
+          {recommendations.map((rec, idx) => (
+            <div key={rec.id || idx} className="flex items-stretch border-b border-gray-200">
+              {/* Left column: user icon + "Clinical Staff" text */}
+              <div className="flex min-w-0 flex-1 items-center gap-3 px-4 py-4">
+                <User className="h-5 w-5 shrink-0 text-gray-700" />
+                <p className="text-sm font-medium text-gray-900">Clinical Staff</p>
               </div>
 
               {/* Vertical divider */}
