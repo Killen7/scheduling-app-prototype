@@ -36,7 +36,9 @@ export function RecommendationsGroup({ recommendations }: RecommendationsGroupPr
             <div key={rec.id || idx} className="flex items-stretch border-b border-gray-200">
               {/* Left column: user icon + "Clinical Staff" text */}
               <div className="flex min-w-0 flex-1 items-center gap-3 px-4 py-4">
-                <User className="h-5 w-5 shrink-0 text-gray-700" />
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-100">
+                  <User className="h-4 w-4 text-red-800" />
+                </div>
                 <p className="text-sm font-medium text-gray-900">Clinical Staff</p>
               </div>
 
