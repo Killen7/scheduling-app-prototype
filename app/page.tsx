@@ -12,7 +12,7 @@ export default function Home() {
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [selectedFloor, setSelectedFloor] = useState('2nd Floor')
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
-  const [selectedFilter, setSelectedFilter] = useState<string>('')
+  const [selectedFilter, setSelectedFilter] = useState<string>('all')
 
   useEffect(() => {
     const loadedStaff = loadStaff()
@@ -28,7 +28,7 @@ export default function Home() {
   const other = staff.filter((s) => s.type === 'other')
 
   const filteredStaff = (members: StaffMember[]) => {
-    if (!selectedFilter) return members
+    if (selectedFilter === 'all' || !selectedFilter) return members
     if (selectedFilter === 'available') {
       return members.filter((m) => m.schedule.includes('AM') || m.schedule.includes('PM'))
     }

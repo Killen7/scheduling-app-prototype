@@ -81,7 +81,7 @@ export function Filters({
           <SelectValue placeholder="Filter by" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">All Staff</SelectItem>
+          <SelectItem value="all">All Staff</SelectItem>
           <SelectItem value="available">Available Today</SelectItem>
           <SelectItem value="providers">Providers Only</SelectItem>
           <SelectItem value="non-clinical">Non-Clinical Only</SelectItem>
