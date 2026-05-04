@@ -3,23 +3,54 @@
 import { useEffect, useState } from 'react'
 import { Header } from '@/components/header'
 import { Filters } from '@/components/filters'
-import { loadStaff, loadRecommendations, StaffMember, Recommendation } from '@/lib/storage'
+import type { StaffMember, Recommendation } from '@/lib/storage'
 import { ScheduleGrid } from '@/components/schedule-grid'
 import { getMonthDates, getWeekDates, type ViewMode } from '@/lib/schedule-utils'
 import { Plus } from 'lucide-react'
 import { MCPPlayground } from '@/components/mcp-playground'
 
+type OfficeOption = {
+  id: string
+  name: string
+}
+
+type OfficeResponse = {
+  items: OfficeOption[]
+}
+
+type ScheduleResponse = {
+  demo?: {
+    staff: StaffMember[]
+  }
+}
+
 export default function Home() {
+  const [offices, setOffices] = useState<OfficeOption[]>([])
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [allRecommendations, setAllRecommendations] = useState<Recommendation[]>([])
-  const [selectedFloor, setSelectedFloor] = useState('2nd Floor')
+  const [selectedOfficeId, setSelectedOfficeId] = useState('')
   const [selectedDate, setSelectedDate] = useState('2026-05-04')
   const [selectedFilter, setSelectedFilter] = useState<string>('all')
   const [viewMode, setViewMode] = useState<ViewMode>('day')
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    setStaff(loadStaff())
-    setAllRecommendations(loadRecommendations())
+    async function loadOffices() {
+      const response = await fetch('/api/app/office')
+      if (!response.ok) throw new Error('Failed to load offices.')
+
+      const data = (await response.json()) as OfficeResponse
+      setOffices(data.items)
+
+      const defaultOffice = data.items.find((office) => office.name === '2nd Floor') ?? data.items[0]
+      if (defaultOffice) setSelectedOfficeId(defaultOffice.id)
+    }
+
+    loadOffices().catch((loadError) => {
+      setError(loadError instanceof Error ? loadError.message : 'Failed to load offices.')
+      setIsLoading(false)
+    })
   }, [])
 
   const dateRange =
@@ -30,20 +61,55 @@ export default function Home() {
         : getMonthDates(selectedDate.slice(0, 7))
 
   const selectedDates = new Set(dateRange)
+  const rangeStart = dateRange[0]
+  const rangeEnd = dateRange[dateRange.length - 1]
+  const selectedOffice = offices.find((office) => office.id === selectedOfficeId)
 
-  const recommendations = allRecommendations.filter(
-    (recommendation) =>
-      recommendation.location === selectedFloor &&
-      selectedDates.has(recommendation.date)
-  )
+  useEffect(() => {
+    if (!selectedOfficeId || !rangeStart || !rangeEnd) return
 
-  const staffByFloorAndRange = staff.filter(
-    (member) =>
-      member.location === selectedFloor &&
-      selectedDates.has(member.date)
-  )
+    async function loadScheduleData() {
+      setIsLoading(true)
+      setError(null)
 
-  const filteredStaff = staffByFloorAndRange.filter((member) => {
+      const scheduleParams = new URLSearchParams()
+      scheduleParams.append('OfficeIds', selectedOfficeId)
+      scheduleParams.set('BeginDate', rangeStart)
+      scheduleParams.set('EndDate', rangeEnd)
+      scheduleParams.set('IsLocationsView', 'true')
+
+      const recommendationParams = new URLSearchParams()
+      recommendationParams.set('officeId', selectedOfficeId)
+      recommendationParams.set('BeginDate', rangeStart)
+      recommendationParams.set('EndDate', rangeEnd)
+
+      const [scheduleResponse, recommendationResponse] = await Promise.all([
+        fetch(`/api/app/schedule/v2?${scheduleParams.toString()}`),
+        fetch(`/api/app/recommendation/recommendation-items?${recommendationParams.toString()}`),
+      ])
+
+      if (!scheduleResponse.ok) throw new Error('Failed to load schedule.')
+      if (!recommendationResponse.ok) throw new Error('Failed to load recommendations.')
+
+      const scheduleData = (await scheduleResponse.json()) as ScheduleResponse
+      const recommendationData = (await recommendationResponse.json()) as Recommendation[]
+
+      setStaff(scheduleData.demo?.staff ?? [])
+      setAllRecommendations(recommendationData)
+      setIsLoading(false)
+    }
+
+    loadScheduleData().catch((loadError) => {
+      setError(loadError instanceof Error ? loadError.message : 'Failed to load schedule data.')
+      setStaff([])
+      setAllRecommendations([])
+      setIsLoading(false)
+    })
+  }, [selectedOfficeId, rangeStart, rangeEnd])
+
+  const recommendations = allRecommendations.filter((recommendation) => selectedDates.has(recommendation.date))
+
+  const filteredStaff = staff.filter((member) => {
     if (selectedFilter === 'providers') return member.type === 'provider'
     if (selectedFilter === 'non-clinical') return member.type === 'non-clinical'
     if (selectedFilter === 'clinical') return member.type === 'clinical'
@@ -56,8 +122,9 @@ export default function Home() {
 
       <main className="w-full">
         <Filters
-          selectedFloor={selectedFloor}
-          onFloorChange={setSelectedFloor}
+          selectedFloor={selectedOfficeId}
+          onFloorChange={setSelectedOfficeId}
+          floors={offices}
           selectedDate={selectedDate}
           onDateChange={setSelectedDate}
           selectedFilter={selectedFilter}
@@ -67,12 +134,24 @@ export default function Home() {
         />
 
         <div className="space-y-0">
-          <ScheduleGrid
-            staff={filteredStaff}
-            recommendations={recommendations}
-            viewMode={viewMode}
-            selectedDate={selectedDate}
-          />
+          {error && (
+            <div className="mx-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          {isLoading && !error ? (
+            <div className="mx-4 rounded-lg border border-gray-200 bg-white p-8 text-center text-sm text-gray-500">
+              Loading schedule from Supabase...
+            </div>
+          ) : (
+            <ScheduleGrid
+              staff={filteredStaff}
+              recommendations={recommendations}
+              viewMode={viewMode}
+              selectedDate={selectedDate}
+            />
+          )}
         </div>
 
         <MCPPlayground />
@@ -87,6 +166,8 @@ export default function Home() {
             title: 'Position',
             type: 'clinical',
             schedule: '8:00 AM - 4:00 PM',
+            location: selectedOffice?.name ?? '2nd Floor',
+            date: selectedDate,
           }
           setStaff([...staff, newStaff])
         }}

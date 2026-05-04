@@ -14,6 +14,7 @@ import {
 interface FiltersProps {
   selectedFloor: string
   onFloorChange: (floor: string) => void
+  floors: { id: string; name: string }[]
   selectedDate: string
   onDateChange: (date: string) => void
   selectedFilter: string
@@ -21,8 +22,6 @@ interface FiltersProps {
   viewMode: ViewMode
   onViewModeChange: (mode: ViewMode) => void
 }
-
-const FLOORS = ['1st Floor', '2nd Floor', '3rd Floor']
 
 // Mon–Fri May 4–8 2026
 const WEEK_DAYS = [
@@ -44,6 +43,7 @@ function formatDate(value: string) {
 export function Filters({
   selectedFloor,
   onFloorChange,
+  floors,
   selectedDate,
   onDateChange,
   selectedFilter,
@@ -62,9 +62,9 @@ export function Filters({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {FLOORS.map((floor) => (
-                <SelectItem key={floor} value={floor}>
-                  {floor}
+              {floors.map((floor) => (
+                <SelectItem key={floor.id} value={floor.id}>
+                  {floor.name}
                 </SelectItem>
               ))}
             </SelectContent>
