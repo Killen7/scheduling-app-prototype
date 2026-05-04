@@ -16,6 +16,12 @@ interface ScheduleGridProps {
   recommendations: Recommendation[]
   viewMode: ViewMode
   selectedDate: string
+  onDeleteShift?: (shiftId: string) => void
+}
+
+interface ShiftCell {
+  id: string
+  schedule: string
 }
 
 interface StaffRow {
@@ -23,7 +29,7 @@ interface StaffRow {
   name: string
   title: string
   type: StaffMember['type']
-  shiftsByDate: Map<string, string>
+  shiftsByDate: Map<string, ShiftCell>
 }
 
 const DAY_CELL_HEIGHT = 90
@@ -47,7 +53,7 @@ function buildStaffRows(staff: StaffMember[]): StaffRow[] {
     const existing = grouped.get(key)
 
     if (existing) {
-      existing.shiftsByDate.set(member.date, member.schedule)
+      existing.shiftsByDate.set(member.date, { id: member.id, schedule: member.schedule })
       continue
     }
 
@@ -56,7 +62,7 @@ function buildStaffRows(staff: StaffMember[]): StaffRow[] {
       name: member.name,
       title: member.title,
       type: member.type,
-      shiftsByDate: new Map([[member.date, member.schedule]]),
+      shiftsByDate: new Map([[member.date, { id: member.id, schedule: member.schedule }]]),
     })
   }
 
@@ -75,7 +81,13 @@ function getRecommendationSlotsByDate(recommendations: Recommendation[]) {
   return byDate
 }
 
-export function ScheduleGrid({ staff, recommendations, viewMode, selectedDate }: ScheduleGridProps) {
+export function ScheduleGrid({
+  staff,
+  recommendations,
+  viewMode,
+  selectedDate,
+  onDeleteShift,
+}: ScheduleGridProps) {
   const staffRows = buildStaffRows(staff)
   const recommendationsByDate = getRecommendationSlotsByDate(recommendations)
   const hasRecommendations = recommendationsByDate.size > 0
@@ -104,6 +116,14 @@ export function ScheduleGrid({ staff, recommendations, viewMode, selectedDate }:
         : columns.length * MONTH_CELL_SIZE
   const columnWidth = viewMode === 'day' ? DAY_HOUR_WIDTH : viewMode === 'week' ? WEEK_CELL_WIDTH : MONTH_CELL_SIZE
 
+  const handleShiftContextMenu = (event: React.MouseEvent, shift: ShiftCell) => {
+    event.preventDefault()
+    if (!onDeleteShift) return
+
+    const confirmed = window.confirm('Delete this shift?')
+    if (confirmed) onDeleteShift(shift.id)
+  }
+
   const renderStaffRow = (row: StaffRow) =>
     viewMode === 'day' ? (
       <div key={row.id} className="flex border-b border-gray-200">
@@ -117,17 +137,24 @@ export function ScheduleGrid({ staff, recommendations, viewMode, selectedDate }:
               <div key={`${row.id}-${column.key}`} className="h-full border-r border-gray-200" style={{ width: DAY_HOUR_WIDTH, minWidth: DAY_HOUR_WIDTH }} />
             ))}
           </div>
-          {row.shiftsByDate.get(selectedDate) && (
-            <div
-              className={`absolute top-1/2 flex -translate-y-1/2 items-center overflow-hidden rounded-[8px] px-2 text-xs font-medium ${getPillColor(row.type)}`}
-              style={{
-                ...getDailyPillStyle(row.shiftsByDate.get(selectedDate)!),
-                height: PILL_HEIGHT,
-              }}
-            >
-              {row.shiftsByDate.get(selectedDate)}
-            </div>
-          )}
+          {(() => {
+            const shift = row.shiftsByDate.get(selectedDate)
+            if (!shift) return null
+
+            return (
+              <div
+                onContextMenu={(event) => handleShiftContextMenu(event, shift)}
+                title="Right click to delete shift"
+                className={`absolute top-1/2 flex -translate-y-1/2 cursor-context-menu items-center overflow-hidden rounded-[8px] px-2 text-xs font-medium ${getPillColor(row.type)}`}
+                style={{
+                  ...getDailyPillStyle(shift.schedule),
+                  height: PILL_HEIGHT,
+                }}
+              >
+                {shift.schedule}
+              </div>
+            )
+          })()}
         </div>
       </div>
     ) : (
@@ -138,7 +165,8 @@ export function ScheduleGrid({ staff, recommendations, viewMode, selectedDate }:
         </div>
         <div className="flex" style={{ width: timeGridWidth }}>
           {columns.map((column) => {
-            const shift = row.shiftsByDate.get(column.key)
+            const shiftCell = row.shiftsByDate.get(column.key)
+            const shift = shiftCell?.schedule
             const showPill = Boolean(shift)
             return (
               <div
@@ -153,15 +181,19 @@ export function ScheduleGrid({ staff, recommendations, viewMode, selectedDate }:
                 {showPill &&
                   (viewMode === 'week' ? (
                     <div
+                      onContextMenu={(event) => shiftCell && handleShiftContextMenu(event, shiftCell)}
+                      title="Right click to delete shift"
                       className={`w-full rounded-[8px] px-2 py-1 text-xs font-medium ${getPillColor(row.type)}`}
-                      style={{ height: PILL_HEIGHT }}
+                      style={{ height: PILL_HEIGHT, cursor: shiftCell ? 'context-menu' : 'default' }}
                     >
                       {shift}
                     </div>
                   ) : (
                     <div
+                      onContextMenu={(event) => shiftCell && handleShiftContextMenu(event, shiftCell)}
+                      title="Right click to delete shift"
                       className={`w-full rounded-[8px] ${getPillColor(row.type).split(' ')[0]}`}
-                      style={{ height: PILL_HEIGHT }}
+                      style={{ height: PILL_HEIGHT, cursor: shiftCell ? 'context-menu' : 'default' }}
                     />
                   ))}
               </div>

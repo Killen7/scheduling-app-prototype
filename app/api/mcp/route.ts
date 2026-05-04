@@ -1,4 +1,10 @@
 import { NextResponse } from 'next/server'
+import {
+  analyzeShiftRequest,
+  createShift,
+  createShiftFromRequest,
+  getShiftCreationContext,
+} from '@/lib/api/teambuilder-service'
 
 type JsonRpcRequest = {
   jsonrpc?: string
@@ -31,6 +37,84 @@ const TOOL_DEFINITIONS = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'get_shift_creation_context',
+    description:
+      'Returns offices and staff options required to create shifts, and optionally staff availability by office/date.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        officeNameOrId: {
+          type: 'string',
+          description: 'Optional office name or UUID to resolve availability context.',
+        },
+        date: {
+          type: 'string',
+          description: 'Optional date in YYYY-MM-DD to fetch availability for the office.',
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'analyze_shift_request',
+    description:
+      'Analyzes free text and detects whether the user is trying to create a shift, including parsed fields.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        requestText: {
+          type: 'string',
+          description: 'Free-text request from the user.',
+        },
+      },
+      required: ['requestText'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'create_shift',
+    description: 'Creates a shift from explicit office, staff, date, and schedule.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        officeNameOrId: {
+          type: 'string',
+          description: 'Office name or UUID.',
+        },
+        staffNameOrId: {
+          type: 'string',
+          description: 'Staff name or UUID.',
+        },
+        date: {
+          type: 'string',
+          description: 'Shift date in YYYY-MM-DD format.',
+        },
+        schedule: {
+          type: 'string',
+          description: 'Schedule in h:mm AM - h:mm PM format.',
+        },
+      },
+      required: ['officeNameOrId', 'staffNameOrId', 'date', 'schedule'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'create_shift_from_request',
+    description:
+      'Parses a natural-language user request, maps office/staff/date/schedule, and creates a shift when unambiguous.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        requestText: {
+          type: 'string',
+          description: 'Free-text request from the user.',
+        },
+      },
+      required: ['requestText'],
+      additionalProperties: false,
+    },
+  },
 ]
 
 function jsonRpcResult(id: JsonRpcRequest['id'], result: unknown) {
@@ -43,6 +127,17 @@ function jsonRpcError(id: JsonRpcRequest['id'], code: number, message: string) {
     id: id ?? null,
     error: { code, message },
   })
+}
+
+function jsonToolContent(payload: unknown) {
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(payload, null, 2),
+      },
+    ],
+  }
 }
 
 export async function POST(request: Request) {
@@ -103,6 +198,97 @@ export async function POST(request: Request) {
           },
         ],
       })
+    }
+
+    if (name === 'get_shift_creation_context') {
+      const officeNameOrId = typeof args.officeNameOrId === 'string' ? args.officeNameOrId : undefined
+      const date = typeof args.date === 'string' ? args.date : undefined
+
+      try {
+        const context = await getShiftCreationContext({ officeNameOrId, date })
+        return jsonRpcResult(body.id, jsonToolContent(context))
+      } catch (error) {
+        return jsonRpcError(
+          body.id,
+          -32000,
+          error instanceof Error ? error.message : 'Failed to load shift creation context.'
+        )
+      }
+    }
+
+    if (name === 'create_shift') {
+      const officeNameOrId = typeof args.officeNameOrId === 'string' ? args.officeNameOrId : ''
+      const staffNameOrId = typeof args.staffNameOrId === 'string' ? args.staffNameOrId : ''
+      const date = typeof args.date === 'string' ? args.date : ''
+      const schedule = typeof args.schedule === 'string' ? args.schedule : ''
+
+      if (!officeNameOrId || !staffNameOrId || !date || !schedule) {
+        return jsonRpcError(
+          body.id,
+          -32602,
+          'Invalid arguments for create_shift. Required: officeNameOrId, staffNameOrId, date, schedule.'
+        )
+      }
+
+      try {
+        const createdShift = await createShift({
+          officeNameOrId,
+          staffNameOrId,
+          date,
+          schedule,
+        })
+        return jsonRpcResult(body.id, jsonToolContent({ ok: true, createdShift }))
+      } catch (error) {
+        return jsonRpcError(
+          body.id,
+          -32001,
+          error instanceof Error ? error.message : 'Failed to create shift.'
+        )
+      }
+    }
+
+    if (name === 'analyze_shift_request') {
+      const requestText = typeof args.requestText === 'string' ? args.requestText : ''
+      if (!requestText) {
+        return jsonRpcError(
+          body.id,
+          -32602,
+          'Invalid arguments for analyze_shift_request. Required: requestText.'
+        )
+      }
+
+      try {
+        const analysis = analyzeShiftRequest(requestText)
+        return jsonRpcResult(body.id, jsonToolContent(analysis))
+      } catch (error) {
+        return jsonRpcError(
+          body.id,
+          -32003,
+          error instanceof Error ? error.message : 'Failed to analyze shift request.'
+        )
+      }
+    }
+
+    if (name === 'create_shift_from_request') {
+      const requestText = typeof args.requestText === 'string' ? args.requestText : ''
+      if (!requestText) {
+        return jsonRpcError(
+          body.id,
+          -32602,
+          'Invalid arguments for create_shift_from_request. Required: requestText.'
+        )
+      }
+
+      try {
+        const result = await createShiftFromRequest(requestText)
+        return jsonRpcResult(body.id, jsonToolContent(result))
+      } catch (error) {
+        return jsonRpcError(
+          body.id,
+          -32002,
+          error instanceof Error ? error.message : 'Failed to parse request and create shift.'
+        )
+      }
     }
 
     return jsonRpcError(body.id, -32601, `Unknown tool "${name}".`)

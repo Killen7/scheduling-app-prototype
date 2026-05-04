@@ -65,39 +65,41 @@ export default function Home() {
   const rangeEnd = dateRange[dateRange.length - 1]
   const selectedOffice = offices.find((office) => office.id === selectedOfficeId)
 
-  useEffect(() => {
+  async function loadScheduleData() {
     if (!selectedOfficeId || !rangeStart || !rangeEnd) return
 
-    async function loadScheduleData() {
-      setIsLoading(true)
-      setError(null)
+    setIsLoading(true)
+    setError(null)
 
-      const scheduleParams = new URLSearchParams()
-      scheduleParams.append('OfficeIds', selectedOfficeId)
-      scheduleParams.set('BeginDate', rangeStart)
-      scheduleParams.set('EndDate', rangeEnd)
-      scheduleParams.set('IsLocationsView', 'true')
+    const scheduleParams = new URLSearchParams()
+    scheduleParams.append('OfficeIds', selectedOfficeId)
+    scheduleParams.set('BeginDate', rangeStart)
+    scheduleParams.set('EndDate', rangeEnd)
+    scheduleParams.set('IsLocationsView', 'true')
 
-      const recommendationParams = new URLSearchParams()
-      recommendationParams.set('officeId', selectedOfficeId)
-      recommendationParams.set('BeginDate', rangeStart)
-      recommendationParams.set('EndDate', rangeEnd)
+    const recommendationParams = new URLSearchParams()
+    recommendationParams.set('officeId', selectedOfficeId)
+    recommendationParams.set('BeginDate', rangeStart)
+    recommendationParams.set('EndDate', rangeEnd)
 
-      const [scheduleResponse, recommendationResponse] = await Promise.all([
-        fetch(`/api/app/schedule/v2?${scheduleParams.toString()}`),
-        fetch(`/api/app/recommendation/recommendation-items?${recommendationParams.toString()}`),
-      ])
+    const [scheduleResponse, recommendationResponse] = await Promise.all([
+      fetch(`/api/app/schedule/v2?${scheduleParams.toString()}`),
+      fetch(`/api/app/recommendation/recommendation-items?${recommendationParams.toString()}`),
+    ])
 
-      if (!scheduleResponse.ok) throw new Error('Failed to load schedule.')
-      if (!recommendationResponse.ok) throw new Error('Failed to load recommendations.')
+    if (!scheduleResponse.ok) throw new Error('Failed to load schedule.')
+    if (!recommendationResponse.ok) throw new Error('Failed to load recommendations.')
 
-      const scheduleData = (await scheduleResponse.json()) as ScheduleResponse
-      const recommendationData = (await recommendationResponse.json()) as Recommendation[]
+    const scheduleData = (await scheduleResponse.json()) as ScheduleResponse
+    const recommendationData = (await recommendationResponse.json()) as Recommendation[]
 
-      setStaff(scheduleData.demo?.staff ?? [])
-      setAllRecommendations(recommendationData)
-      setIsLoading(false)
-    }
+    setStaff(scheduleData.demo?.staff ?? [])
+    setAllRecommendations(recommendationData)
+    setIsLoading(false)
+  }
+
+  useEffect(() => {
+    if (!selectedOfficeId || !rangeStart || !rangeEnd) return
 
     loadScheduleData().catch((loadError) => {
       setError(loadError instanceof Error ? loadError.message : 'Failed to load schedule data.')
@@ -116,9 +118,33 @@ export default function Home() {
     return true
   })
 
+  async function handleDeleteShift(shiftId: string) {
+    try {
+      const response = await fetch(`/api/app/shift-request/${shiftId}?sendNotification=false`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete shift.')
+      }
+
+      await loadScheduleData()
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Failed to delete shift.')
+    }
+  }
+
+  async function handleMcpShiftCreatedSuccess() {
+    try {
+      await loadScheduleData()
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Failed to refresh schedule data.')
+    }
+  }
+
   return (
     <div className="min-h-screen bg-white">
-      <Header />
+      <Header onShiftCreatedSuccess={handleMcpShiftCreatedSuccess} />
 
       <main className="w-full">
         <Filters
@@ -150,11 +176,12 @@ export default function Home() {
               recommendations={recommendations}
               viewMode={viewMode}
               selectedDate={selectedDate}
+              onDeleteShift={handleDeleteShift}
             />
           )}
         </div>
 
-        <MCPPlayground />
+        <MCPPlayground onShiftCreatedSuccess={handleMcpShiftCreatedSuccess} />
       </main>
 
       {/* Floating Action Button */}

@@ -28,6 +28,66 @@ const PREVIEW_HOUR_WIDTH = 60
 const PREVIEW_ROW_HEIGHT = 60
 const PREVIEW_PILL_HEIGHT = 50
 
+type JsonRpcResponse = {
+  jsonrpc: '2.0'
+  id: string | number | null
+  result?: unknown
+  error?: {
+    code: number
+    message: string
+  }
+}
+
+type ShiftDraft = {
+  officeNameOrId: string
+  staffNameOrId: string
+  date: string
+  schedule: string
+}
+
+type AnalyzeShiftPayload = {
+  intent?: 'create_shift' | 'none'
+  parsed?: {
+    officeQuery?: string | null
+    staffQuery?: string | null
+    date?: string | null
+    schedule?: string | null
+  }
+  missingFields?: string[]
+}
+
+async function callMcpTool(name: string, args: Record<string, unknown>) {
+  const response = await fetch('/api/mcp', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: crypto.randomUUID(),
+      method: 'tools/call',
+      params: {
+        name,
+        arguments: args,
+      },
+    }),
+  })
+
+  return (await response.json()) as JsonRpcResponse
+}
+
+function parseToolPayload(response: JsonRpcResponse): unknown {
+  if (!response.result || typeof response.result !== 'object') return null
+  const resultRecord = response.result as { content?: Array<{ type?: string; text?: string }> }
+  const text = resultRecord.content?.find((item) => item.type === 'text')?.text
+  if (!text) return null
+  try {
+    return JSON.parse(text)
+  } catch {
+    return text
+  }
+}
+
 function getPillColor(type: StaffMember['type'] | 'recommendation') {
   if (type === 'provider') return 'bg-[#ebeef0] text-gray-900'
   if (type === 'recommendation') return 'bg-red-100 text-red-800 border border-red-200'
@@ -195,10 +255,24 @@ function MiniSchedulePreview({
   )
 }
 
-export function Spotlight() {
+interface SpotlightProps {
+  onShiftCreatedSuccess?: () => Promise<void> | void
+}
+
+export function Spotlight({ onShiftCreatedSuccess }: SpotlightProps) {
   const [open, setOpen] = useState(false)
   const [previewOffice, setPreviewOffice] = useState<string | null>(null)
   const [previewDate, setPreviewDate] = useState('')
+  const [query, setQuery] = useState('')
+  const [showCreateShiftForm, setShowCreateShiftForm] = useState(false)
+  const [shiftDraft, setShiftDraft] = useState<ShiftDraft>({
+    officeNameOrId: '',
+    staffNameOrId: '',
+    date: '',
+    schedule: '',
+  })
+  const [shiftActionLoading, setShiftActionLoading] = useState(false)
+  const [shiftActionMessage, setShiftActionMessage] = useState<string | null>(null)
 
   const offices = useMemo(() => LOCATIONS.slice(0, 3), [])
   const people = useMemo(() => getTopPeople(), [])
@@ -222,6 +296,14 @@ export function Spotlight() {
   }, [open])
 
   useEffect(() => {
+    if (!open) {
+      setQuery('')
+      setShowCreateShiftForm(false)
+      setShiftActionMessage(null)
+    }
+  }, [open])
+
+  useEffect(() => {
     if (!previewOffice) {
       setPreviewDate('')
       return
@@ -237,6 +319,56 @@ export function Spotlight() {
 
     setPreviewDate(availableDates[0] ?? '')
   }, [previewOffice, staff, recommendations])
+
+  useEffect(() => {
+    if (!open || query.trim().length < 8) return
+
+    const timeoutId = window.setTimeout(async () => {
+      const analysis = await callMcpTool('analyze_shift_request', { requestText: query })
+      if (analysis.error) return
+
+      const payload = parseToolPayload(analysis) as AnalyzeShiftPayload | null
+      if (!payload || payload.intent !== 'create_shift') return
+
+      setShowCreateShiftForm(true)
+      setShiftDraft((current) => ({
+        officeNameOrId: payload.parsed?.officeQuery ?? current.officeNameOrId,
+        staffNameOrId: payload.parsed?.staffQuery ?? current.staffNameOrId,
+        date: payload.parsed?.date ?? current.date,
+        schedule: payload.parsed?.schedule ?? current.schedule,
+      }))
+    }, 250)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [open, query])
+
+  const createShiftFromDraft = async () => {
+    setShiftActionLoading(true)
+    setShiftActionMessage(null)
+    try {
+      const response = await callMcpTool('create_shift', {
+        officeNameOrId: shiftDraft.officeNameOrId,
+        staffNameOrId: shiftDraft.staffNameOrId,
+        date: shiftDraft.date,
+        schedule: shiftDraft.schedule,
+      })
+
+      if (response.error) {
+        setShiftActionMessage(response.error.message)
+        return
+      }
+
+      const payload = parseToolPayload(response) as { ok?: boolean } | null
+      if (payload?.ok) {
+        setShiftActionMessage('Shift created successfully.')
+        await onShiftCreatedSuccess?.()
+      } else {
+        setShiftActionMessage('Shift could not be created.')
+      }
+    } finally {
+      setShiftActionLoading(false)
+    }
+  }
 
   return (
     <>
@@ -257,9 +389,84 @@ export function Spotlight() {
         description="Quick access to offices and people."
         className="max-w-[560px]"
       >
-        <CommandInput placeholder="Search offices or people..." />
+        <CommandInput
+          value={query}
+          onValueChange={setQuery}
+          placeholder="Search offices, people, or write: create shift for..."
+        />
+        {showCreateShiftForm && (
+          <div className="border-b px-3 py-3">
+            <p className="mb-2 text-xs font-semibold text-neutral-800">Create Shift</p>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              <input
+                value={shiftDraft.officeNameOrId}
+                onChange={(event) =>
+                  setShiftDraft((current) => ({ ...current, officeNameOrId: event.target.value }))
+                }
+                placeholder="Office name or ID"
+                className="rounded-md border border-gray-300 px-2 py-1.5 text-xs"
+              />
+              <input
+                value={shiftDraft.staffNameOrId}
+                onChange={(event) =>
+                  setShiftDraft((current) => ({ ...current, staffNameOrId: event.target.value }))
+                }
+                placeholder="Staff name or ID"
+                className="rounded-md border border-gray-300 px-2 py-1.5 text-xs"
+              />
+              <input
+                value={shiftDraft.date}
+                onChange={(event) =>
+                  setShiftDraft((current) => ({ ...current, date: event.target.value }))
+                }
+                placeholder="YYYY-MM-DD"
+                className="rounded-md border border-gray-300 px-2 py-1.5 text-xs"
+              />
+              <input
+                value={shiftDraft.schedule}
+                onChange={(event) =>
+                  setShiftDraft((current) => ({ ...current, schedule: event.target.value }))
+                }
+                placeholder="h:mm AM - h:mm PM"
+                className="rounded-md border border-gray-300 px-2 py-1.5 text-xs"
+              />
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              <Button size="sm" onClick={createShiftFromDraft} disabled={shiftActionLoading}>
+                {shiftActionLoading ? 'Creating...' : 'Create shift'}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowCreateShiftForm(false)}
+                disabled={shiftActionLoading}
+              >
+                Cancel
+              </Button>
+            </div>
+            {shiftActionMessage && (
+              <p className="mt-2 text-xs text-neutral-700">{shiftActionMessage}</p>
+            )}
+          </div>
+        )}
         <CommandList>
           <CommandEmpty>No results found.</CommandEmpty>
+
+          <CommandGroup heading="Actions">
+            <CommandItem
+              value="create shift"
+              onSelect={() => {
+                setShowCreateShiftForm(true)
+                setShiftActionMessage(null)
+              }}
+              className="data-[selected=true]:bg-neutral-100 data-[selected=true]:text-neutral-900"
+            >
+              <CalendarIcon className="size-4" />
+              <span>Create shift</span>
+            </CommandItem>
+          </CommandGroup>
+
+          <CommandSeparator />
 
           <CommandGroup heading="Offices">
             {offices.map((office) => (
