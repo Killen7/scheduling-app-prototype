@@ -2,7 +2,7 @@
 
 import { Menu, Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Spotlight } from '@/components/spotlight'
+import { LightshotBar } from '@/components/lightshot/LightshotBar'
 import {
   Sheet,
   SheetContent,
@@ -54,7 +54,7 @@ export function Header({ onMenuClick }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-2">
-        <Spotlight />
+        <LightshotBar />
         <Button variant="ghost" size="icon">
           <Bell className="size-5" />
           <span className="sr-only">Notifications</span>
