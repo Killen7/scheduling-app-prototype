@@ -1,0 +1,1951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TeamBuilder — Lightshot Bar</title>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy: #3d52a0;
+    --navy-dark: #2d3f7c;
+    --navy-light: #e8ecf7;
+    --accent: #3d52a0;
+    --text: #1a1f36;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --bg: #f8f9fc;
+    --white: #ffffff;
+    --shift-blue: #dbeafe;
+    --shift-blue-border: #bfdbfe;
+
+    /* Lightshot — light mode */
+    --ls-bg: rgba(255, 255, 255, 0.97);
+    --ls-border: rgba(0,0,0,0.09);
+    --ls-input-bg: rgba(0,0,0,0.03);
+    --ls-text: #1a1f36;
+    --ls-muted: #6b7280;
+    --ls-accent: #3d52a0;
+    --ls-accent2: #6d5bc8;
+    --ls-hover: rgba(0,0,0,0.04);
+    --ls-panel-bg: rgba(248,249,252,0.99);
+    --ls-divider: rgba(0,0,0,0.07);
+    --ls-success: #059669;
+    --ls-warn: #d97706;
+    --ls-error: #dc2626;
+    --ls-radius: 16px;
+    --ls-item-radius: 10px;
+  }
+
+  body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── APP SHELL ── */
+  .app { display: flex; flex-direction: column; height: 100vh; }
+
+  .topbar-announcement {
+    background: var(--navy);
+    color: rgba(255,255,255,0.85);
+    font-size: 12px;
+    text-align: right;
+    padding: 4px 20px;
+  }
+
+  .navbar {
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    height: 52px;
+    gap: 32px;
+  }
+  .navbar-logo {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--navy);
+    letter-spacing: -0.3px;
+    white-space: nowrap;
+  }
+  .navbar-logo span { color: var(--navy); opacity: 0.6; font-weight: 400; }
+  .navbar-nav { display: flex; gap: 4px; flex: 1; }
+  .nav-item {
+    padding: 6px 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 6px;
+    position: relative;
+  }
+  .nav-item.active { color: var(--navy); font-weight: 600; }
+  .nav-item.active::after {
+    content: '';
+    position: absolute;
+    bottom: -13px;
+    left: 0; right: 0;
+    height: 2px;
+    background: var(--navy);
+  }
+  .navbar-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+  .navbar-icon { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); cursor: pointer; }
+  .navbar-icon:hover { background: var(--navy-light); color: var(--navy); }
+  .navbar-avatar {
+    display: flex; align-items: center; gap: 6px; cursor: pointer;
+    font-size: 12px; color: var(--text); padding: 4px 8px;
+    border-radius: 6px;
+  }
+  .navbar-avatar:hover { background: var(--navy-light); }
+  .avatar-circle {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--navy); color: white;
+    font-size: 11px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .toolbar {
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 8px 20px;
+    gap: 8px;
+  }
+  .view-tabs { display: flex; gap: 2px; }
+  .view-tab {
+    padding: 5px 12px; font-size: 12px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; color: var(--text-muted);
+    border: 1px solid transparent;
+  }
+  .view-tab.active { background: var(--navy); color: white; }
+  .view-tab:not(.active):hover { background: var(--navy-light); }
+  .select-pill {
+    padding: 5px 10px 5px 12px; font-size: 12px; font-weight: 500;
+    border: 1px solid var(--border); border-radius: 6px;
+    background: white; color: var(--text); cursor: pointer;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .date-nav { display: flex; align-items: center; gap: 8px; margin: 0 auto; }
+  .date-nav-arrow {
+    width: 26px; height: 26px; border-radius: 5px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); border: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .date-nav-arrow:hover { background: var(--navy-light); }
+  .date-label { font-size: 13px; font-weight: 600; color: var(--text); min-width: 80px; text-align: center; }
+  .toolbar-right { display: flex; gap: 6px; margin-left: auto; }
+  .icon-btn {
+    width: 30px; height: 30px; border-radius: 6px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); border: 1px solid var(--border); background: white;
+  }
+  .icon-btn:hover { background: var(--navy-light); color: var(--navy); border-color: var(--navy-light); }
+  .add-shift-btn {
+    display: flex; align-items: center; gap: 0;
+    background: var(--navy); color: white; border-radius: 7px;
+    font-size: 12px; font-weight: 600; cursor: pointer; overflow: hidden;
+  }
+  .add-shift-main { padding: 6px 12px; }
+  .add-shift-arrow { padding: 6px 8px; border-left: 1px solid rgba(255,255,255,0.2); }
+
+  /* schedule grid */
+  .schedule-area { flex: 1; overflow: auto; }
+  .time-header {
+    display: grid;
+    grid-template-columns: 192px repeat(15, 1fr);
+    border-bottom: 1px solid var(--border);
+    background: white;
+    position: sticky; top: 0; z-index: 2;
+  }
+  .time-cell {
+    font-size: 11px; color: var(--text-muted); padding: 6px 8px;
+    border-right: 1px solid var(--border); text-align: center;
+  }
+  .time-cell:first-child { border-right: 1px solid var(--border); }
+
+  .section-header {
+    display: grid;
+    grid-template-columns: 192px 1fr;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .section-label {
+    padding: 7px 12px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
+    color: var(--text-muted); text-transform: uppercase;
+    border-right: 1px solid var(--border);
+  }
+  .section-toggle { display: flex; align-items: center; justify-content: flex-end; padding: 0 12px; cursor: pointer; color: var(--text-muted); }
+
+  .person-row {
+    display: grid;
+    grid-template-columns: 192px 1fr;
+    border-bottom: 1px solid var(--border);
+    min-height: 56px;
+  }
+  .person-info {
+    padding: 8px 12px; border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  }
+  .person-avatar-row { display: flex; align-items: center; gap: 8px; }
+  .person-circle {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--navy-light); color: var(--navy);
+    font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .person-name { font-size: 12px; font-weight: 600; color: var(--text); }
+  .person-role { font-size: 10px; color: var(--text-muted); padding-left: 32px; }
+  .person-badge { font-size: 9px; background: var(--navy-light); color: var(--navy); padding: 1px 5px; border-radius: 3px; margin-top: 2px; margin-left: 32px; width: fit-content; }
+
+  .shift-timeline { position: relative; }
+  .shift-block {
+    position: absolute;
+    top: 8px; height: calc(100% - 16px);
+    background: var(--shift-blue);
+    border: 1px solid var(--shift-blue-border);
+    border-radius: 5px;
+    display: flex; align-items: center;
+    padding: 0 10px;
+    font-size: 11px; font-weight: 500; color: #2563eb;
+    white-space: nowrap;
+  }
+
+  /* ── LIGHTSHOT OVERLAY ── */
+  .ls-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.25);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    display: flex; flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 120px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+    overflow: visible;
+  }
+  .ls-backdrop.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .ls-container {
+    width: 620px;
+    max-width: calc(100vw - 32px);
+    background: var(--ls-bg);
+    border: 1px solid var(--ls-border);
+    border-radius: var(--ls-radius);
+    box-shadow:
+      0 0 0 1px rgba(61,82,160,0.06),
+      0 8px 32px rgba(0,0,0,0.12),
+      0 32px 64px rgba(0,0,0,0.08);
+    overflow: hidden;
+    transform: scale(0.96) translateY(-8px);
+    transition: transform 0.2s cubic-bezier(0.34,1.2,0.64,1);
+    position: relative;
+  }
+  .ls-backdrop.open .ls-container {
+    transform: scale(1) translateY(0);
+  }
+
+  .ls-input-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--ls-divider);
+  }
+  .ls-search-icon { color: var(--ls-muted); flex-shrink: 0; }
+  .ls-input {
+    flex: 1;
+    background: transparent;
+    border: none; outline: none;
+    font-size: 15px;
+    color: var(--ls-text);
+    font-family: inherit;
+    caret-color: var(--ls-accent);
+  }
+  .ls-input::placeholder { color: var(--ls-muted); }
+  .ls-kbd {
+    font-size: 10px; color: var(--ls-muted);
+    background: rgba(0,0,0,0.04);
+    border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 5px;
+    padding: 2px 6px;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+
+  /* quick picks */
+  .ls-quick-picks {
+    display: flex;
+    gap: 6px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--ls-divider);
+    flex-wrap: wrap;
+  }
+  .ls-pick {
+    display: flex; align-items: center; gap: 7px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(0,0,0,0.09);
+    background: rgba(0,0,0,0.03);
+    color: var(--ls-text);
+    font-size: 12px; font-weight: 500;
+    cursor: pointer;
+    transition: all 0.13s ease;
+    user-select: none;
+  }
+  .ls-pick:hover, .ls-pick.active {
+    background: rgba(61,82,160,0.08);
+    border-color: rgba(61,82,160,0.25);
+    color: var(--ls-accent);
+  }
+  .ls-pick.active {
+    background: rgba(61,82,160,0.1);
+    border-color: rgba(61,82,160,0.35);
+  }
+  /* Primary "Create Shift" pick — always navy filled */
+  .ls-pick-primary {
+    background: var(--navy);
+    border-color: var(--navy);
+    color: white;
+  }
+  .ls-pick-primary:hover {
+    background: var(--navy-dark);
+    border-color: var(--navy-dark);
+    color: white;
+  }
+  .ls-pick-primary.active {
+    background: var(--navy-dark);
+    border-color: var(--navy-dark);
+    color: white;
+  }
+  .ls-pick-primary .ls-pick-icon {
+    background: rgba(255,255,255,0.18);
+    color: white;
+  }
+  .ls-pick-icon {
+    width: 20px; height: 20px;
+    border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+  }
+  .ls-pick-icon.shift { background: rgba(61,82,160,0.12); color: #3d52a0; }
+  .ls-pick-icon.people { background: rgba(5,150,105,0.1); color: #059669; }
+  .ls-pick-icon.offices { background: rgba(217,119,6,0.1); color: #d97706; }
+  .ls-pick-icon.ai { background: linear-gradient(135deg, rgba(109,91,200,0.12), rgba(61,82,160,0.12)); color: #6d5bc8; }
+
+  /* results / panels */
+  .ls-results {
+    max-height: 480px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .ls-results::-webkit-scrollbar { width: 4px; }
+  .ls-results::-webkit-scrollbar-track { background: transparent; }
+  .ls-results::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 4px; }
+
+  .ls-section-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+    color: var(--ls-muted); text-transform: uppercase;
+    padding: 10px 16px 4px;
+    border-bottom: none;
+  }
+
+  .ls-result-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 14px;
+    cursor: pointer;
+    border-radius: 0;
+    transition: background 0.1s;
+    position: relative;
+  }
+  .ls-result-item:hover, .ls-result-item.focused {
+    background: var(--ls-hover);
+  }
+  .ls-result-item.focused::before {
+    content: '';
+    position: absolute; left: 0; top: 4px; bottom: 4px;
+    width: 2px; background: var(--ls-accent);
+    border-radius: 0 2px 2px 0;
+  }
+  .ls-result-title { font-size: 13px; font-weight: 500; color: var(--ls-text); }
+  .ls-result-sub { font-size: 11px; color: var(--ls-muted); margin-top: 1px; }
+  .ls-result-icon {
+    width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+  }
+  .ls-result-content { flex: 1; min-width: 0; }
+  .ls-result-badge {
+    font-size: 10px; padding: 2px 7px; border-radius: 20px;
+    font-weight: 500; flex-shrink: 0;
+  }
+  .badge-avail { background: rgba(5,150,105,0.1); color: #059669; }
+  .badge-partial { background: rgba(217,119,6,0.1); color: #d97706; }
+  .badge-busy { background: rgba(220,38,38,0.1); color: #dc2626; }
+  .badge-pto { background: rgba(220,38,38,0.08); color: #dc2626; }
+
+  .ls-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px;
+    border-top: 1px solid var(--ls-divider);
+  }
+  .ls-footer-hints { display: flex; gap: 10px; }
+  .ls-hint { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--ls-muted); }
+
+  /* ── EXPANDED PANELS ── */
+  .ls-panel {
+    padding: 0;
+  }
+
+  /* Create Shift Panel */
+  .shift-panel { padding: 16px; }
+  .shift-panel-title {
+    font-size: 13px; font-weight: 600; color: var(--ls-text);
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .shift-panel-title .step-badge {
+    font-size: 10px; background: rgba(61,82,160,0.1); color: var(--ls-accent);
+    padding: 2px 8px; border-radius: 20px; font-weight: 500;
+  }
+
+  .shift-steps { display: flex; gap: 4px; margin-bottom: 16px; }
+  .shift-step {
+    flex: 1; height: 3px; border-radius: 2px;
+    background: rgba(0,0,0,0.08);
+    transition: background 0.3s;
+  }
+  .shift-step.done { background: var(--ls-accent); }
+  .shift-step.active { background: rgba(61,82,160,0.4); }
+
+  .field-group { margin-bottom: 12px; }
+  .field-label { font-size: 11px; color: var(--ls-muted); margin-bottom: 5px; font-weight: 500; }
+  .field-options { display: flex; gap: 6px; flex-wrap: wrap; }
+  .field-opt {
+    padding: 6px 12px; border-radius: 7px; font-size: 12px; font-weight: 500;
+    border: 1px solid rgba(0,0,0,0.1); color: var(--ls-muted);
+    cursor: pointer; transition: all 0.12s; background: rgba(0,0,0,0.02);
+  }
+  .field-opt:hover { border-color: rgba(61,82,160,0.35); color: var(--ls-accent); background: rgba(61,82,160,0.05); }
+  .field-opt.selected {
+    background: rgba(61,82,160,0.1); border-color: rgba(61,82,160,0.4);
+    color: var(--ls-text);
+    font-weight: 600;
+  }
+
+  .time-range { display: flex; gap: 8px; align-items: center; }
+  .time-input {
+    flex: 1;
+    background: rgba(0,0,0,0.03);
+    border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13px; font-weight: 600;
+    color: var(--ls-text);
+    font-family: inherit;
+    outline: none;
+    text-align: center;
+  }
+  .time-input:focus { border-color: rgba(61,82,160,0.4); background: rgba(61,82,160,0.05); }
+  .time-sep { color: var(--ls-muted); font-size: 14px; }
+
+  .ls-action-btn {
+    width: 100%; padding: 10px;
+    background: var(--ls-accent);
+    border: none; border-radius: 9px;
+    color: white; font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+    margin-top: 4px;
+    transition: opacity 0.15s, transform 0.1s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .ls-action-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+  .ls-action-btn:active { transform: translateY(0); }
+  .ls-action-btn.secondary {
+    background: rgba(0,0,0,0.04);
+    border: 1px solid rgba(0,0,0,0.1);
+    color: var(--ls-text);
+  }
+  .ls-action-btn.secondary:hover { background: rgba(0,0,0,0.07); }
+
+  .conflict-chip {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 10px; border-radius: 7px;
+    background: rgba(220,38,38,0.06); border: 1px solid rgba(220,38,38,0.15);
+    font-size: 11px; color: #dc2626; margin-top: 8px;
+  }
+  .ok-chip {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 10px; border-radius: 7px;
+    background: rgba(5,150,105,0.07); border: 1px solid rgba(5,150,105,0.2);
+    font-size: 11px; color: #059669; margin-top: 8px;
+  }
+
+  /* People panel */
+  .people-grid { padding: 8px 0; }
+  .person-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 14px;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .person-item:hover { background: var(--ls-hover); }
+  .person-avail-dot {
+    width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+    margin-left: auto;
+  }
+  .dot-avail { background: #059669; }
+  .dot-partial { background: #d97706; }
+  .dot-busy { background: #dc2626; }
+
+  /* AI panel */
+  .ai-panel { padding: 14px 16px; }
+  .ai-thinking {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--ls-muted);
+    padding: 8px 0;
+  }
+  .ai-dots span {
+    display: inline-block;
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--ls-accent);
+    animation: blink 1.2s infinite;
+    margin-right: 2px;
+  }
+  .ai-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .ai-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink {
+    0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+    40% { opacity: 1; transform: scale(1); }
+  }
+
+  .ai-response {
+    background: rgba(61,82,160,0.05);
+    border: 1px solid rgba(61,82,160,0.15);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13px; color: var(--ls-text);
+    line-height: 1.55;
+    margin-bottom: 12px;
+  }
+  .ai-action-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .ai-chip {
+    padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: 500;
+    border: 1px solid rgba(61,82,160,0.2);
+    color: var(--ls-accent); cursor: pointer; background: rgba(61,82,160,0.06);
+    transition: all 0.12s;
+  }
+  .ai-chip:hover { background: rgba(61,82,160,0.12); border-color: rgba(61,82,160,0.35); }
+
+  .ai-gradient-border {
+    background: linear-gradient(var(--ls-bg), var(--ls-bg)) padding-box,
+                linear-gradient(135deg, #6e8efb, #a78bfa) border-box;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 2px;
+    margin-bottom: 10px;
+  }
+  .ai-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.05em;
+    color: var(--ls-accent2); text-transform: uppercase;
+    padding: 4px 10px;
+    background: rgba(109,91,200,0.08);
+    border-radius: 20px;
+    margin-bottom: 10px;
+  }
+
+  /* offices panel */
+  .office-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: background 0.1s;
+    border-bottom: 1px solid var(--ls-divider);
+    position: relative;
+  }
+  .office-item:last-child { border-bottom: none; }
+  .office-item:hover { background: var(--ls-hover); }
+  .office-item:hover::before {
+    content: '';
+    position: absolute; left:0; top:4px; bottom:4px;
+    width:2px; background: var(--ls-accent); border-radius: 0 2px 2px 0;
+  }
+  .office-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: rgba(217,119,6,0.08); border: 1px solid rgba(217,119,6,0.15);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    color: #d97706; font-size: 15px;
+  }
+  .office-stats { display: flex; gap: 10px; margin-top: 3px; }
+  .office-stat { font-size: 10px; color: var(--ls-muted); }
+  .office-stat strong { color: var(--ls-text); }
+
+  /* keyboard hint bar */
+  .hint-bar {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255,255,255,0.9);
+    border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-size: 11px; color: rgba(0,0,0,0.4);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    z-index: 10;
+    pointer-events: none;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .hint-bar kbd {
+    background: rgba(0,0,0,0.06);
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 4px; padding: 1px 6px;
+    font-family: inherit; font-size: 10px; color: rgba(0,0,0,0.5);
+  }
+
+  /* ── HOVER PEEK ── */
+  .peek-wrap {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    border-radius: var(--ls-radius);
+    overflow: hidden;
+    pointer-events: all;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  .peek-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    overflow: hidden;
+    animation: peekIn 0.2s cubic-bezier(0.34,1.2,0.64,1) both;
+    min-height: 0;
+  }
+  @keyframes peekIn {
+    from { opacity: 0; transform: translateX(12px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  .peek-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 14px 10px;
+    border-bottom: 1px solid var(--ls-divider);
+    flex-shrink: 0;
+  }
+  .peek-title { font-size: 13px; font-weight: 600; color: var(--ls-text); flex: 1; }
+  .peek-subtitle { font-size: 11px; color: var(--ls-muted); }
+  .peek-dismiss {
+    font-size: 10px; color: var(--ls-muted);
+    background: rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.09);
+    border-radius: 5px; padding: 2px 7px; cursor: pointer;
+    font-family: inherit; flex-shrink: 0;
+  }
+  .peek-dismiss:hover { background: rgba(0,0,0,0.07); color: var(--ls-text); }
+
+  /* Office day schedule grid */
+  .peek-day-grid { flex: 1; overflow-y: auto; padding: 0 0 0; min-height: 0; }
+  .peek-day-grid::-webkit-scrollbar { width: 4px; }
+  .peek-day-grid::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 4px; }
+  .peek-week-grid { flex: 1; overflow-y: auto; padding: 0 0 0; min-height: 0; }
+  .peek-week-grid::-webkit-scrollbar { width: 4px; }
+  .peek-week-grid::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 4px; }
+  .peek-times-row {
+    display: grid;
+    padding: 0 14px;
+    gap: 0;
+    border-bottom: 1px solid var(--ls-divider);
+  }
+  .peek-time-cell {
+    font-size: 9px; color: var(--ls-muted);
+    padding: 4px 0; text-align: center;
+  }
+  .peek-person-row {
+    display: grid;
+    padding: 0 14px;
+    align-items: center;
+    min-height: 36px;
+    border-bottom: 1px solid var(--ls-divider);
+  }
+  .peek-person-row:last-child { border-bottom: none; }
+  .peek-person-label {
+    font-size: 11px; color: var(--ls-text); font-weight: 500;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    padding-right: 8px;
+  }
+  .peek-person-sublabel {
+    font-size: 9px; color: var(--ls-muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .peek-timeline { position: relative; height: 36px; }
+  .peek-shift-bar {
+    position: absolute; top: 6px; bottom: 6px;
+    border-radius: 4px;
+    display: flex; align-items: center;
+    padding: 0 6px;
+    font-size: 9px; font-weight: 600;
+    white-space: nowrap; overflow: hidden;
+    transition: filter 0.15s;
+  }
+  .peek-shift-bar:hover { filter: brightness(1.2); }
+  .peek-pto-bar {
+    position: absolute; top: 6px; bottom: 6px;
+    border-radius: 4px;
+    background: rgba(220,38,38,0.08);
+    border: 1px solid rgba(220,38,38,0.2);
+    display: flex; align-items: center;
+    padding: 0 6px;
+    font-size: 9px; color: #dc2626;
+    white-space: nowrap;
+  }
+  .peek-unavail-bar {
+    position: absolute; top: 6px; bottom: 6px;
+    border-radius: 4px;
+    background: repeating-linear-gradient(
+      45deg,
+      rgba(0,0,0,0.02),
+      rgba(0,0,0,0.02) 3px,
+      transparent 3px,
+      transparent 6px
+    );
+    border: 1px solid rgba(0,0,0,0.08);
+  }
+
+  /* Person week grid */
+  .peek-week-header {
+    display: grid;
+    grid-template-columns: 120px repeat(7, 1fr);
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--ls-divider);
+    gap: 4px;
+  }
+  .peek-week-day {
+    text-align: center;
+    font-size: 10px; font-weight: 600;
+    color: var(--ls-muted);
+    padding: 3px 0;
+  }
+  .peek-week-day.today { color: var(--ls-accent); }
+  .peek-week-row {
+    display: grid;
+    grid-template-columns: 120px repeat(7, 1fr);
+    padding: 4px 14px;
+    gap: 4px;
+    align-items: center;
+    border-bottom: 1px solid var(--ls-divider);
+    min-height: 40px;
+  }
+  .peek-week-row:last-child { border-bottom: none; }
+  .peek-week-label {
+    font-size: 10px; color: var(--ls-muted);
+    padding-right: 8px;
+    line-height: 1.3;
+  }
+  .peek-cell {
+    border-radius: 5px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 600;
+  }
+  .peek-cell-empty {
+    background: rgba(0,0,0,0.02);
+    border: 1px dashed rgba(0,0,0,0.08);
+  }
+  .peek-cell-shift {
+    background: rgba(61,82,160,0.1);
+    border: 1px solid rgba(61,82,160,0.25);
+    color: #3d52a0;
+  }
+  .peek-cell-pto {
+    background: rgba(220,38,38,0.07);
+    border: 1px solid rgba(220,38,38,0.18);
+    color: #dc2626;
+  }
+  .peek-cell-avail {
+    background: rgba(5,150,105,0.08);
+    border: 1px solid rgba(5,150,105,0.18);
+    color: #059669;
+  }
+  .peek-cell-unavail {
+    background: repeating-linear-gradient(
+      45deg,
+      rgba(0,0,0,0.015),
+      rgba(0,0,0,0.015) 2px,
+      transparent 2px,
+      transparent 5px
+    );
+    border: 1px solid rgba(0,0,0,0.07);
+    color: rgba(0,0,0,0.2);
+  }
+  .peek-cell-callout {
+    background: rgba(217,119,6,0.07);
+    border: 1px solid rgba(217,119,6,0.22);
+    color: #b45309;
+    position: relative;
+    overflow: hidden;
+  }
+  .peek-cell-callout::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      -45deg,
+      transparent, transparent 3px,
+      rgba(217,119,6,0.06) 3px, rgba(217,119,6,0.06) 5px
+    );
+  }
+  .peek-cell-request {
+    background: rgba(61,82,160,0.06);
+    border: 1px dashed rgba(61,82,160,0.35);
+    color: #3d52a0;
+  }
+  .peek-legend {
+    display: flex; flex-direction: row; flex-wrap: nowrap;
+    gap: 16px; padding: 8px 14px;
+    border-top: 1px solid var(--ls-divider);
+    flex-shrink: 0; overflow-x: auto;
+    align-items: center;
+    justify-content: flex-start;
+  }
+  .peek-legend::-webkit-scrollbar { display: none; }
+  .peek-legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--ls-muted); white-space: nowrap; flex-shrink: 0; }
+  .peek-legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+  /* success toast */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: white;
+    border: 1px solid rgba(5,150,105,0.2);
+    border-radius: 10px;
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; color: var(--ls-text);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+    z-index: 200;
+    transform: translateY(8px);
+    opacity: 0;
+    transition: all 0.25s cubic-bezier(0.34,1.2,0.64,1);
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast-dot { width: 8px; height: 8px; border-radius: 50%; background: #059669; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ── DATA ──
+const OFFICES = [
+  { id: 1, name: "2nd Floor", floor: 2, capacity: 12, staffed: 8, shifts: 5 },
+  { id: 2, name: "3rd Floor – West", floor: 3, capacity: 10, staffed: 6, shifts: 3 },
+  { id: 3, name: "ICU Suite", floor: 4, capacity: 6, staffed: 6, shifts: 6 },
+  { id: 4, name: "ER / Triage", floor: 1, capacity: 20, staffed: 14, shifts: 9 },
+];
+
+const PEOPLE = [
+  { id: 1, name: "Andersons, Adam", role: "Doctor of Osteopathic Medicine", avail: "avail", office: "2nd Floor" },
+  { id: 2, name: "Finch, Aaron", role: "Doctor of Dental Surgery", avail: "avail", office: "2nd Floor" },
+  { id: 3, name: "Adam Markam", role: "Admin Assistant", avail: "partial", office: "2nd Floor" },
+  { id: 4, name: "Adnan Clinical", role: "Clinical Research Assistant", avail: "partial", office: "3rd Floor – West" },
+  { id: 5, name: "Alice Robert", role: "Nurse Practitioner", avail: "busy", office: "ICU Suite" },
+  { id: 6, name: "Chen, Maria", role: "Registered Nurse", avail: "avail", office: "ER / Triage" },
+  { id: 7, name: "Torres, Ben", role: "Surgical Tech", avail: "busy", office: "ICU Suite", conflict: "PTO" },
+];
+
+const SCHEDULE_PEOPLE = [
+  { section: "PROVIDERS", people: [
+    { name: "Andersons, Adam", role: "Doctor of Osteopathic Medicine, Av...", shift: { start: 16, end: 56, label: "8:00 AM - 4:00 PM" } },
+    { name: "Finch, Aaron", role: "Doctor of Dental Surgery, Anesthes...", shift: { start: 16, end: 56, label: "8:00 AM - 4:00 PM" } },
+  ]},
+  { section: "NON-CLINICAL STAFF", people: [
+    { name: "Adam Markam", role: "Admin Assistant", badge: "227", shift: { start: 16, end: 56, label: "8:00 AM - 4:00 PM" } },
+    { name: "Adnan Clinical", role: "Clinical Research Assistant", badge: "11.5", shift: { start: 16, end: 56, label: "8:00 AM - 4:00 PM" } },
+  ]},
+  { section: "atbbbbbbbbbbbbbbbbbbbbbbbbbbbbb...", people: [
+    { name: "Alice Robert", role: "||||||||||||||||||||||", badge: "8", shift: { start: 16, end: 56, label: "8:00 AM - 4:00 PM" } },
+  ]},
+];
+
+const TIMES = ["6am","7am","8am","9am","10am","11am","12pm","1pm","2pm","3pm","4pm","5pm","6pm","7pm","8pm"];
+
+// Hours shown in peek: 6am–8pm = 14 hours
+const PEEK_HOURS = [6,7,8,9,10,11,12,13,14,15,16,17,18,19,20];
+const PEEK_HOUR_LABELS = ["6a","7a","8a","9a","10a","11a","12p","1p","2p","3p","4p","5p","6p","7p","8p"];
+
+// Office day schedule data: grouped by section, with shifts/PTO for May 4
+const OFFICE_DAY_SCHEDULE = {
+  1: { // 2nd Floor
+    sections: [
+      { label: 'PROVIDERS', people: [
+        { name: "Andersons, Adam", role: "Doctor of Osteopathic Medicine", shifts: [{start:8,end:16,color:'rgba(110,142,251,0.25)',border:'rgba(110,142,251,0.45)',label:'8a–4p'}] },
+        { name: "Finch, Aaron",    role: "Doctor of Dental Surgery",       shifts: [{start:8,end:16,color:'rgba(110,142,251,0.25)',border:'rgba(110,142,251,0.45)',label:'8a–4p'}] },
+      ]},
+      { label: 'NON-CLINICAL STAFF', people: [
+        { name: "Adam Markam",   role: "Admin Assistant",            shifts: [{start:9,end:13,color:'rgba(52,211,153,0.2)',border:'rgba(52,211,153,0.35)',label:'9a–1p'}] },
+        { name: "Adnan Clinical",role: "Clinical Research Assistant", shifts: [{start:10,end:18,color:'rgba(167,139,250,0.2)',border:'rgba(167,139,250,0.35)',label:'10a–6p'}] },
+      ]},
+    ]
+  },
+  2: { // 3rd Floor – West
+    sections: [
+      { label: 'PROVIDERS', people: [
+        { name: "Chen, Maria", role: "Registered Nurse", shifts: [{start:7,end:15,color:'rgba(110,142,251,0.25)',border:'rgba(110,142,251,0.45)',label:'7a–3p'}] },
+      ]},
+      { label: 'NON-CLINICAL STAFF', people: [
+        { name: "Adnan Clinical", role: "Clinical Research Assistant", shifts: [{start:10,end:18,color:'rgba(167,139,250,0.2)',border:'rgba(167,139,250,0.35)',label:'10a–6p'}] },
+        { name: "Park, Jin",      role: "Lab Tech",                   shifts: [], pto: {start:8,end:17,label:'PTO'} },
+      ]},
+    ]
+  },
+  3: { // ICU Suite
+    sections: [
+      { label: 'PROVIDERS', people: [
+        { name: "Alice Robert",  role: "Nurse Practitioner", shifts: [{start:8,end:20,color:'rgba(110,142,251,0.25)',border:'rgba(110,142,251,0.45)',label:'8a–8p'}] },
+        { name: "Nguyen, Linh",  role: "Registered Nurse",  shifts: [{start:12,end:20,color:'rgba(52,211,153,0.2)',border:'rgba(52,211,153,0.35)',label:'12p–8p'}] },
+      ]},
+      { label: 'NON-CLINICAL STAFF', people: [
+        { name: "Torres, Ben", role: "Surgical Tech", shifts: [], pto: {start:8,end:17,label:'PTO'} },
+      ]},
+    ]
+  },
+  4: { // ER / Triage
+    sections: [
+      { label: 'PROVIDERS', people: [
+        { name: "Diaz, Sofia",  role: "MD",                shifts: [{start:15,end:20,color:'rgba(251,191,36,0.18)',border:'rgba(251,191,36,0.35)',label:'3p–8p'}] },
+        { name: "Walsh, Kevin", role: "Physician Assistant",shifts: [{start:8,end:16,color:'rgba(167,139,250,0.2)',border:'rgba(167,139,250,0.35)',label:'8a–4p'}] },
+      ]},
+      { label: 'NON-CLINICAL STAFF', people: [
+        { name: "Chen, Maria",  role: "Registered Nurse", shifts: [{start:7,end:15,color:'rgba(110,142,251,0.25)',border:'rgba(110,142,251,0.45)',label:'7a–3p'}] },
+        { name: "Kim, James",   role: "Lab Tech",         shifts: [{start:6,end:14,color:'rgba(110,142,251,0.25)',border:'rgba(110,142,251,0.45)',label:'6a–2p'}] },
+      ]},
+    ]
+  },
+};
+
+// Person weekly schedule data (Mon Apr 27 – Sun May 3... use May 4 week: Mon May 4 – Sun May 10)
+const WEEK_DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const WEEK_DATES = ['May 4','May 5','May 6','May 7','May 8','May 9','May 10'];
+const TODAY_IDX = 0; // May 4 is Monday
+
+// Row categories per person in week view
+const PERSON_WEEK_DATA = {
+  1: { // Andersons, Adam
+    rows: [
+      { label: 'Shifts',       cells: ['8a–4p','8a–4p','8a–4p','','8a–4p','',''],   types: ['shift','shift','shift','empty','shift','empty','empty'] },
+      { label: 'Callouts',     cells: ['','','','','','',''],                         types: ['empty','empty','empty','empty','empty','empty','empty'] },
+      { label: 'Requests',     cells: ['','','','8a–4p','','',''],                    types: ['empty','empty','empty','request','empty','empty','empty'] },
+      { label: 'Availability', cells: ['✓','✓','✓','✓','✓','',''],                  types: ['avail','avail','avail','avail','avail','unavail','unavail'] },
+      { label: 'PTO',          cells: ['','','','','','',''],                         types: ['empty','empty','empty','empty','empty','empty','empty'] },
+    ]
+  },
+  2: { // Finch, Aaron
+    rows: [
+      { label: 'Shifts',       cells: ['8a–4p','','10a–6p','8a–4p','','',''],        types: ['shift','empty','shift','shift','empty','empty','empty'] },
+      { label: 'Callouts',     cells: ['','8a–4p','','','','',''],                    types: ['empty','callout','empty','empty','empty','empty','empty'] },
+      { label: 'Requests',     cells: ['','','','','8a–4p','',''],                    types: ['empty','empty','empty','empty','request','empty','empty'] },
+      { label: 'Availability', cells: ['✓','✓','✓','✓','✓','',''],                  types: ['avail','avail','avail','avail','avail','unavail','unavail'] },
+      { label: 'PTO',          cells: ['','','','','','PTO','PTO'],                   types: ['empty','empty','empty','empty','empty','pto','pto'] },
+    ]
+  },
+  3: { // Adam Markam
+    rows: [
+      { label: 'Shifts',       cells: ['9a–1p','9a–1p','','9a–1p','9a–1p','',''],   types: ['shift','shift','empty','shift','shift','empty','empty'] },
+      { label: 'Callouts',     cells: ['','','9a–1p','','','',''],                    types: ['empty','empty','callout','empty','empty','empty','empty'] },
+      { label: 'Requests',     cells: ['','','','','','',''],                         types: ['empty','empty','empty','empty','empty','empty','empty'] },
+      { label: 'Availability', cells: ['✓','✓','✓','✓','✓','',''],                  types: ['avail','avail','avail','avail','avail','unavail','unavail'] },
+      { label: 'PTO',          cells: ['','','','','','',''],                         types: ['empty','empty','empty','empty','empty','empty','empty'] },
+    ]
+  },
+  4: { // Adnan Clinical
+    rows: [
+      { label: 'Shifts',       cells: ['10a–6p','10a–6p','10a–6p','10a–6p','10a–6p','',''], types: ['shift','shift','shift','shift','shift','empty','empty'] },
+      { label: 'Callouts',     cells: ['','','','','','',''],                                types: ['empty','empty','empty','empty','empty','empty','empty'] },
+      { label: 'Requests',     cells: ['','','','','','10a–6p',''],                          types: ['empty','empty','empty','empty','empty','request','empty'] },
+      { label: 'Availability', cells: ['✓','✓','✓','✓','✓','✓',''],                        types: ['avail','avail','avail','avail','avail','avail','unavail'] },
+      { label: 'PTO',          cells: ['','','','','','',''],                                types: ['empty','empty','empty','empty','empty','empty','empty'] },
+    ]
+  },
+  5: { // Alice Robert
+    rows: [
+      { label: 'Shifts',       cells: ['8a–8p','8a–8p','','8a–8p','','',''],         types: ['shift','shift','empty','shift','empty','empty','empty'] },
+      { label: 'Callouts',     cells: ['','','8a–8p','','','',''],                    types: ['empty','empty','callout','empty','empty','empty','empty'] },
+      { label: 'Requests',     cells: ['','','','','8a–4p','',''],                    types: ['empty','empty','empty','empty','request','empty','empty'] },
+      { label: 'Availability', cells: ['✓','✓','✓','✓','✓','',''],                  types: ['avail','avail','avail','avail','avail','unavail','unavail'] },
+      { label: 'PTO',          cells: ['','','','','','PTO','PTO'],                   types: ['empty','empty','empty','empty','empty','pto','pto'] },
+    ]
+  },
+  6: { // Chen, Maria
+    rows: [
+      { label: 'Shifts',       cells: ['7a–3p','7a–3p','7a–3p','','7a–3p','',''],   types: ['shift','shift','shift','empty','shift','empty','empty'] },
+      { label: 'Callouts',     cells: ['','','','7a–3p','','',''],                    types: ['empty','empty','empty','callout','empty','empty','empty'] },
+      { label: 'Requests',     cells: ['','','','','','',''],                         types: ['empty','empty','empty','empty','empty','empty','empty'] },
+      { label: 'Availability', cells: ['✓','✓','✓','✓','✓','',''],                  types: ['avail','avail','avail','avail','avail','unavail','unavail'] },
+      { label: 'PTO',          cells: ['','','','','','',''],                         types: ['empty','empty','empty','empty','empty','empty','empty'] },
+    ]
+  },
+  7: { // Torres, Ben
+    rows: [
+      { label: 'Shifts',       cells: ['','','','','','',''],                         types: ['empty','empty','empty','empty','empty','empty','empty'] },
+      { label: 'Callouts',     cells: ['8a–4p','','','','','',''],                    types: ['callout','empty','empty','empty','empty','empty','empty'] },
+      { label: 'Requests',     cells: ['','','','','','',''],                         types: ['empty','empty','empty','empty','empty','empty','empty'] },
+      { label: 'Availability', cells: ['✓','✓','✓','✓','✓','',''],                  types: ['avail','avail','avail','avail','avail','unavail','unavail'] },
+      { label: 'PTO',          cells: ['PTO','PTO','PTO','','','',''],                types: ['pto','pto','pto','empty','empty','empty','empty'] },
+    ]
+  },
+};
+
+// ── OFFICE PEEK ──
+function OfficePeek({ office, onDismiss }) {
+  const schedule = OFFICE_DAY_SCHEDULE[office.id] || { sections: [] };
+  const totalHours = PEEK_HOURS.length - 1; // 6am–8pm = 14 hours
+  const COLS = 148; // px for name col
+
+  function hourToPercent(h) {
+    return ((h - PEEK_HOURS[0]) / totalHours) * 100;
+  }
+
+  const totalPeople = schedule.sections.reduce((sum, s) => sum + s.people.length, 0);
+
+  function PersonRow({ p }) {
+    return (
+      <div style={{display:'grid', gridTemplateColumns:`${COLS}px 1fr`, padding:'0 14px', alignItems:'center', minHeight:36, borderBottom:'1px solid rgba(0,0,0,0.05)'}}>
+        <div style={{paddingRight:10, display:'flex', alignItems:'center', gap:6}}>
+          <div style={{
+            width:20, height:20, borderRadius:'50%', flexShrink:0,
+            background: p.pto ? 'rgba(248,113,113,0.15)' : 'rgba(110,142,251,0.15)',
+            color: p.pto ? '#f87171' : '#a5b8ff',
+            fontSize:9, fontWeight:700,
+            display:'flex', alignItems:'center', justifyContent:'center'
+          }}>
+            {p.name.split(',')[0][0] || p.name[0]}
+          </div>
+          <div style={{minWidth:0}}>
+            <div className="peek-person-label" style={{fontSize:10}}>{p.name}</div>
+            <div className="peek-person-sublabel">{p.role}</div>
+          </div>
+        </div>
+        <div className="peek-timeline">
+          {/* Hour grid lines */}
+          {PEEK_HOURS.map((h, hi) => (
+            <div key={h} style={{
+              position:'absolute', top:0, bottom:0,
+              left:`${(hi/(PEEK_HOURS.length-1))*100}%`,
+              width:1, background:'rgba(0,0,0,0.05)'
+            }} />
+          ))}
+          {/* PTO */}
+          {p.pto && (
+            <div className="peek-pto-bar" style={{
+              left:`${hourToPercent(p.pto.start)}%`,
+              width:`${hourToPercent(p.pto.end)-hourToPercent(p.pto.start)}%`,
+            }}>{p.pto.label}</div>
+          )}
+          {/* Shifts */}
+          {p.shifts && p.shifts.map((s, si) => (
+            <div key={si} className="peek-shift-bar" style={{
+              left:`${hourToPercent(s.start)}%`,
+              width:`${hourToPercent(s.end)-hourToPercent(s.start)}%`,
+              background:s.color, border:`1px solid ${s.border}`, color:s.border,
+            }}>
+              {hourToPercent(s.end)-hourToPercent(s.start) > 10 ? s.label : ''}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="peek-wrap">
+      <div className="peek-card">
+        {/* Header */}
+        <div className="peek-header">
+          <div style={{
+            width:28, height:28, borderRadius:7,
+            background:'rgba(251,191,36,0.12)', border:'1px solid rgba(251,191,36,0.2)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            color:'#fbbf24', fontSize:13, flexShrink:0
+          }}>⬡</div>
+          <div style={{flex:1}}>
+            <div className="peek-title">{office.name}</div>
+            <div className="peek-subtitle">May 4, 2026 · {totalPeople} people scheduled</div>
+          </div>
+          <kbd className="peek-dismiss" onClick={onDismiss}>ESC to close</kbd>
+        </div>
+
+        <div className="peek-day-grid">
+          {/* Sticky time ruler */}
+          <div style={{
+            display:'grid',
+            gridTemplateColumns:`${COLS}px repeat(${PEEK_HOUR_LABELS.length}, 1fr)`,
+            padding:'0 14px',
+            borderBottom:'1px solid rgba(0,0,0,0.07)',
+            background:'#fff',
+            position:'sticky', top:0, zIndex:2
+          }}>
+            <div style={{fontSize:9, color:'var(--ls-muted)', padding:'4px 0', paddingLeft:26}}>Person</div>
+            {PEEK_HOUR_LABELS.map(t => (
+              <div key={t} className="peek-time-cell">{t}</div>
+            ))}
+          </div>
+
+          {/* Sections */}
+          {schedule.sections.map((section, si) => (
+            <React.Fragment key={si}>
+              {/* Section header — matches main app style */}
+              <div style={{
+                display:'grid', gridTemplateColumns:`${COLS}px 1fr`,
+                padding:'0 14px',
+                background:'rgba(0,0,0,0.025)',
+                borderBottom:'1px solid rgba(0,0,0,0.07)',
+                borderTop: si > 0 ? '1px solid rgba(0,0,0,0.07)' : 'none',
+              }}>
+                <div style={{
+                  padding:'5px 0',
+                  fontSize:9, fontWeight:700, letterSpacing:'0.07em',
+                  color:'var(--ls-muted)', textTransform:'uppercase',
+                }}>
+                  {section.label}
+                </div>
+                <div style={{
+                  display:'grid',
+                  gridTemplateColumns:`repeat(${PEEK_HOUR_LABELS.length}, 1fr)`,
+                  alignItems:'center'
+                }}>
+                  {/* Faint column stripes under header */}
+                  {PEEK_HOUR_LABELS.map((_, i) => (
+                    <div key={i} style={{height:'100%', borderLeft:'1px solid rgba(0,0,0,0.04)'}} />
+                  ))}
+                </div>
+              </div>
+
+              {/* People rows */}
+              {section.people.map((p, pi) => (
+                <PersonRow key={pi} p={p} />
+              ))}
+            </React.Fragment>
+          ))}
+        </div>
+
+        <div className="peek-legend">
+          <div className="peek-legend-item"><div className="peek-legend-dot" style={{background:'rgba(110,142,251,0.4)'}}/>Shift</div>
+          <div className="peek-legend-item"><div className="peek-legend-dot" style={{background:'rgba(5,150,105,0.3)'}}/>Alt shift</div>
+          <div className="peek-legend-item"><div className="peek-legend-dot" style={{background:'rgba(220,38,38,0.3)'}}/>PTO</div>
+          <div className="peek-legend-item"><div className="peek-legend-dot" style={{background:'rgba(0,0,0,0.06)', border:'1px dashed rgba(0,0,0,0.15)'}}/>Unavailable</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── PERSON PEEK ──
+function PersonPeek({ person, onDismiss }) {
+  const weekData = PERSON_WEEK_DATA[person.id] || { rows: [] };
+  const cellTypeClass = {
+    shift:    'peek-cell peek-cell-shift',
+    callout:  'peek-cell peek-cell-callout',
+    request:  'peek-cell peek-cell-request',
+    pto:      'peek-cell peek-cell-pto',
+    avail:    'peek-cell peek-cell-avail',
+    unavail:  'peek-cell peek-cell-unavail',
+    empty:    'peek-cell peek-cell-empty',
+  };
+
+  // Row accent colors for the left label strip
+  const rowAccent = {
+    'Shifts':       'rgba(110,142,251,0.5)',
+    'Callouts':     'rgba(251,191,36,0.5)',
+    'Requests':     'rgba(110,142,251,0.35)',
+    'Availability': 'rgba(52,211,153,0.5)',
+    'PTO':          'rgba(248,113,113,0.5)',
+  };
+
+  const availColor = person.avail === 'avail' ? '#34d399' : person.avail === 'partial' ? '#fbbf24' : '#f87171';
+  const availBg    = person.avail === 'avail' ? 'rgba(52,211,153,0.12)' : person.avail === 'partial' ? 'rgba(251,191,36,0.12)' : 'rgba(248,113,113,0.12)';
+
+  return (
+    <div className="peek-wrap">
+      <div className="peek-card">
+        <div className="peek-header">
+          <div style={{
+            width:32, height:32, borderRadius:'50%',
+            background: availBg, border:`1px solid ${availColor}44`,
+            display:'flex', alignItems:'center', justifyContent:'center',
+            color: availColor, fontSize:13, fontWeight:700, flexShrink:0
+          }}>
+            {person.name.split(',')[0][0] || person.name[0]}
+          </div>
+          <div style={{flex:1}}>
+            <div className="peek-title">{person.name}</div>
+            <div className="peek-subtitle">{person.role} · {person.office} · May 4–10, 2026</div>
+          </div>
+          <kbd className="peek-dismiss" onClick={onDismiss}>ESC to close</kbd>
+        </div>
+
+        <div className="peek-week-grid">
+          {/* Day header */}
+          <div className="peek-week-header" style={{position:'sticky', top:0, zIndex:2, background:'#fff', borderBottom:'1px solid rgba(0,0,0,0.07)'}}>
+            <div />
+            {WEEK_DAYS.map((d, i) => (
+              <div key={d} className={`peek-week-day ${i === TODAY_IDX ? 'today' : ''}`}>
+                <div>{d}</div>
+                <div style={{fontSize:9, fontWeight:400, opacity:0.6, marginTop:1}}>{WEEK_DATES[i].split(' ')[1]}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Data rows */}
+          {weekData.rows.map((row, ri) => (
+            <div key={ri} className="peek-week-row" style={{
+              borderLeft: `2px solid ${rowAccent[row.label] || 'transparent'}`,
+            }}>
+              <div className="peek-week-label" style={{
+                color: rowAccent[row.label] ? rowAccent[row.label] : 'var(--ls-muted)',
+                fontWeight: 600,
+              }}>
+                {row.label}
+              </div>
+              {row.cells.map((cell, ci) => (
+                <div key={ci} className={cellTypeClass[row.types[ci]] || 'peek-cell peek-cell-empty'}
+                  title={row.types[ci] === 'callout' ? 'Shift was cancelled' : row.types[ci] === 'request' ? 'Pending approval' : undefined}
+                >
+                  {cell}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        <div className="peek-legend">
+          <div className="peek-legend-item"><div className="peek-legend-dot" style={{background:'rgba(110,142,251,0.4)'}}/>Shift</div>
+          <div className="peek-legend-item"><div className="peek-legend-dot" style={{background:'rgba(251,191,36,0.35)'}}/>Callout</div>
+          <div className="peek-legend-item"><div className="peek-legend-dot" style={{background:'transparent', border:'1px dashed rgba(110,142,251,0.5)'}}/>Request</div>
+          <div className="peek-legend-item"><div className="peek-legend-dot" style={{background:'rgba(52,211,153,0.3)'}}/>Available</div>
+          <div className="peek-legend-item"><div className="peek-legend-dot" style={{background:'rgba(248,113,113,0.35)'}}/>PTO</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── SHIFT PANEL ──
+function ShiftPanel({ onClose, onSuccess }) {
+  const [step, setStep] = useState(0); // 0=office, 1=date+time, 2=person
+  const [office, setOffice] = useState(null);
+  const [date, setDate] = useState("May 4, 2026");
+  const [startTime, setStartTime] = useState("08:00");
+  const [endTime, setEndTime] = useState("16:00");
+  const [person, setPerson] = useState(null);
+
+  const availPeople = PEOPLE.filter(p => p.avail !== "busy" && p.avail !== "pto");
+
+  const canAdvance = step === 0 ? !!office : step === 1 ? !!startTime && !!endTime : !!person;
+
+  function handleCreate() {
+    onSuccess(`Shift created for ${person?.name} at ${office?.name}`);
+    onClose();
+  }
+
+  return (
+    <div className="shift-panel">
+      <div className="shift-panel-title">
+        <span>
+          {step === 0 && "Select Office"}
+          {step === 1 && "Set Date & Time"}
+          {step === 2 && "Assign Person"}
+        </span>
+        <span className="step-badge">Step {step + 1} of 3</span>
+      </div>
+
+      <div className="shift-steps">
+        {[0,1,2].map(i => (
+          <div key={i} className={`shift-step ${i < step ? 'done' : i === step ? 'active' : ''}`} />
+        ))}
+      </div>
+
+      {step === 0 && (
+        <div className="field-group">
+          <div className="field-label">OFFICE</div>
+          <div className="field-options">
+            {OFFICES.map(o => (
+              <div key={o.id}
+                className={`field-opt ${office?.id === o.id ? 'selected' : ''}`}
+                onClick={() => setOffice(o)}>
+                {o.name}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {step === 1 && (
+        <>
+          <div className="field-group">
+            <div className="field-label">DATE</div>
+            <div className="field-options">
+              {["May 4","May 5","May 6","May 7","May 8"].map(d => (
+                <div key={d}
+                  className={`field-opt ${date.includes(d) ? 'selected' : ''}`}
+                  onClick={() => setDate(d + ", 2026")}>
+                  {d}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="field-group">
+            <div className="field-label">TIME RANGE</div>
+            <div className="time-range">
+              <input className="time-input" type="time" value={startTime}
+                onChange={e => setStartTime(e.target.value)} />
+              <span className="time-sep">→</span>
+              <input className="time-input" type="time" value={endTime}
+                onChange={e => setEndTime(e.target.value)} />
+            </div>
+          </div>
+        </>
+      )}
+
+      {step === 2 && (
+        <div className="field-group">
+          <div className="field-label">AVAILABLE PEOPLE</div>
+          {availPeople.map(p => (
+            <div key={p.id}
+              className={`ls-result-item ${person?.id === p.id ? 'focused' : ''}`}
+              style={{borderRadius: 8, marginBottom: 2}}
+              onClick={() => setPerson(p)}>
+              <div className="ls-result-icon" style={{background: p.avail === 'avail' ? 'rgba(52,211,153,0.12)' : 'rgba(251,191,36,0.12)'}}>
+                {p.name[0]}
+              </div>
+              <div className="ls-result-content">
+                <div className="ls-result-title">{p.name}</div>
+                <div className="ls-result-sub">{p.role} · {p.office}</div>
+              </div>
+              <span className={`ls-result-badge ${p.avail === 'avail' ? 'badge-avail' : 'badge-partial'}`}>
+                {p.avail === 'avail' ? 'Available' : 'Partial'}
+              </span>
+            </div>
+          ))}
+          {PEOPLE.filter(p => p.avail === 'busy' || p.conflict).length > 0 && (
+            <>
+              <div className="field-label" style={{marginTop:10}}>CONFLICTS</div>
+              {PEOPLE.filter(p => p.avail === 'busy' || p.conflict).map(p => (
+                <div key={p.id} className="ls-result-item" style={{borderRadius:8, opacity:0.5, cursor:'not-allowed'}}>
+                  <div className="ls-result-icon" style={{background:'rgba(248,113,113,0.12)'}}>
+                    {p.name[0]}
+                  </div>
+                  <div className="ls-result-content">
+                    <div className="ls-result-title">{p.name}</div>
+                    <div className="ls-result-sub">{p.conflict || 'Shift conflict'}</div>
+                  </div>
+                  <span className="ls-result-badge badge-busy">
+                    {p.conflict || 'Busy'}
+                  </span>
+                </div>
+              ))}
+            </>
+          )}
+          {person && (
+            <div className="ok-chip">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M2 6l3 3 5-5" stroke="#34d399" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              {person.name} is available for {startTime}–{endTime} on {date}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{display:'flex', gap:6, marginTop:4}}>
+        {step > 0 && (
+          <button className="ls-action-btn secondary" onClick={() => setStep(s => s - 1)} style={{flex:'0 0 auto', width:'auto', padding:'9px 14px'}}>
+            ← Back
+          </button>
+        )}
+        {step < 2 ? (
+          <button className="ls-action-btn" onClick={() => setStep(s => s + 1)} disabled={!canAdvance}
+            style={{opacity: canAdvance ? 1 : 0.4, cursor: canAdvance ? 'pointer' : 'not-allowed'}}>
+            Continue →
+          </button>
+        ) : (
+          <button className="ls-action-btn" onClick={handleCreate} disabled={!canAdvance}
+            style={{opacity: canAdvance ? 1 : 0.4}}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M2 7l4 4 6-6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Create Shift
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── PEOPLE PANEL ──
+function PeoplePanel({ query, onPersonHover, onPersonLeave }) {
+  const filtered = PEOPLE.filter(p =>
+    query.length < 2 || p.name.toLowerCase().includes(query.toLowerCase()) || p.role.toLowerCase().includes(query.toLowerCase())
+  );
+  const availMap = { avail: 'dot-avail', partial: 'dot-partial', busy: 'dot-busy' };
+  const labelMap = { avail: 'Available', partial: 'Partial avail.', busy: 'Unavailable' };
+  const badgeMap = { avail: 'badge-avail', partial: 'badge-partial', busy: 'badge-busy' };
+  const hoverTimers = useRef({});
+
+  function handleMouseEnter(p) {
+    hoverTimers.current[p.id] = setTimeout(() => onPersonHover(p), 320);
+  }
+  function handleMouseLeave(p) {
+    clearTimeout(hoverTimers.current[p.id]);
+  }
+
+  return (
+    <div className="people-grid">
+      <div className="ls-section-label">People · {filtered.length} found</div>
+      {filtered.map(p => (
+        <div key={p.id} className="person-item"
+          onMouseEnter={() => handleMouseEnter(p)}
+          onMouseLeave={() => handleMouseLeave(p)}
+        >
+          <div className="ls-result-icon" style={{
+            background: p.avail === 'avail' ? 'rgba(52,211,153,0.12)' : p.avail === 'partial' ? 'rgba(251,191,36,0.12)' : 'rgba(248,113,113,0.12)',
+            width: 32, height: 32, borderRadius: 8, display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize: 12, color: p.avail === 'avail' ? '#34d399' : p.avail === 'partial' ? '#fbbf24' : '#f87171', flexShrink:0
+          }}>
+            {p.name.split(',')[0][0] || p.name[0]}
+          </div>
+          <div className="ls-result-content">
+            <div className="ls-result-title">{p.name}</div>
+            <div className="ls-result-sub">{p.role} · {p.office}</div>
+          </div>
+          <span className={`ls-result-badge ${badgeMap[p.avail]}`}>{p.conflict || labelMap[p.avail]}</span>
+          <div className={`person-avail-dot ${availMap[p.avail]}`} style={{marginLeft: 6}}></div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── OFFICES PANEL ──
+function OfficesPanel({ query, onOfficeHover, onOfficeLeave }) {
+  const filtered = OFFICES.filter(o =>
+    query.length < 2 || o.name.toLowerCase().includes(query.toLowerCase())
+  );
+  const hoverTimers = useRef({});
+
+  function handleMouseEnter(o) {
+    hoverTimers.current[o.id] = setTimeout(() => onOfficeHover(o), 320);
+  }
+  function handleMouseLeave(o) {
+    clearTimeout(hoverTimers.current[o.id]);
+  }
+
+  return (
+    <div>
+      <div className="ls-section-label">Offices · {filtered.length} found</div>
+      {filtered.map(o => (
+        <div key={o.id} className="office-item"
+          onMouseEnter={() => handleMouseEnter(o)}
+          onMouseLeave={() => handleMouseLeave(o)}
+        >
+          <div className="office-icon">⬡</div>
+          <div style={{flex:1}}>
+            <div className="ls-result-title">{o.name}</div>
+            <div className="office-stats">
+              <span className="office-stat"><strong>{o.staffed}</strong>/{o.capacity} staffed</span>
+              <span className="office-stat"><strong>{o.shifts}</strong> shifts today</span>
+            </div>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <div style={{
+              width: 44, height: 6, borderRadius: 3,
+              background: 'rgba(0,0,0,0.08)',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                height: '100%',
+                width: `${(o.staffed/o.capacity)*100}%`,
+                background: o.staffed/o.capacity > 0.85 ? '#34d399' : o.staffed/o.capacity > 0.5 ? '#fbbf24' : '#f87171',
+                borderRadius: 3
+              }} />
+            </div>
+            <div style={{fontSize:9, color:'var(--ls-muted)', marginTop:3}}>capacity</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── AI PANEL ──
+function AIPanel({ query, onAction }) {
+  const [phase, setPhase] = useState('thinking'); // thinking | response
+  const [response, setResponse] = useState(null);
+
+  useEffect(() => {
+    setPhase('thinking');
+    setResponse(null);
+    const t = setTimeout(async () => {
+      // Use the built-in claude helper
+      try {
+        const text = await window.claude.complete(
+          `You are an AI assistant embedded in a healthcare scheduling platform called TeamBuilder. 
+The user typed: "${query}"
+
+Respond in 1-2 short sentences as a scheduling assistant. Suggest what action to take (create a shift, view people availability, check an office, etc). Be concise and helpful. Do NOT use markdown.`
+        );
+        setResponse(text);
+      } catch(e) {
+        setResponse(`I can help you schedule that. Based on your request, I'd suggest creating a shift for ${query.includes('Alice') ? 'Alice Robert' : 'available staff'} — availability looks good for today.`);
+      }
+      setPhase('response');
+    }, 900);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const chips = query.toLowerCase().includes('shift') || query.toLowerCase().includes('schedule')
+    ? ['Create shift', 'Check availability', 'View conflicts']
+    : query.toLowerCase().includes('office') || query.toLowerCase().includes('floor')
+    ? ['View office', 'Show staff', 'See capacity']
+    : ['Create shift', 'Find available', 'View offices'];
+
+  return (
+    <div className="ai-panel">
+      <div className="ai-badge">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+          <path d="M5 1L6.2 3.8L9 4.3L7 6.2L7.5 9L5 7.6L2.5 9L3 6.2L1 4.3L3.8 3.8L5 1Z" fill="#c4b5fd"/>
+        </svg>
+        AI Assistant
+      </div>
+
+      {phase === 'thinking' && (
+        <div className="ai-thinking">
+          <div className="ai-dots">
+            <span/><span/><span/>
+          </div>
+          Analyzing your request…
+        </div>
+      )}
+
+      {phase === 'response' && response && (
+        <>
+          <div className="ai-response">{response}</div>
+          <div className="ai-action-chips">
+            {chips.map(c => (
+              <div key={c} className="ai-chip" onClick={() => onAction(c)}>{c}</div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── LIGHTSHOT BAR ──
+function LightshotBar({ onSuccess }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [activePanel, setActivePanel] = useState(null);
+  const [hoveredOffice, setHoveredOffice] = useState(null);
+  const [hoveredPerson, setHoveredPerson] = useState(null);
+  const inputRef = useRef(null);
+  const backdropRef = useRef(null);
+
+  const openBar = useCallback(() => {
+    setOpen(true);
+    setQuery('');
+    setActivePanel(null);
+    setHoveredOffice(null);
+    setHoveredPerson(null);
+    setTimeout(() => inputRef.current?.focus(), 80);
+  }, []);
+
+  const closeBar = useCallback(() => {
+    setOpen(false);
+    setTimeout(() => {
+      setQuery('');
+      setActivePanel(null);
+      setHoveredOffice(null);
+      setHoveredPerson(null);
+    }, 200);
+  }, []);
+
+  const dismissPeek = useCallback(() => {
+    setHoveredOffice(null);
+    setHoveredPerson(null);
+  }, []);
+
+  useEffect(() => {
+    function onKey(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        open ? closeBar() : openBar();
+        return;
+      }
+      if (e.key === 'Escape') {
+        if (hoveredOffice || hoveredPerson) {
+          e.preventDefault();
+          e.stopPropagation();
+          dismissPeek();
+        } else if (open) {
+          closeBar();
+        }
+        return;
+      }
+      // Any non-modifier key dismisses the peek (but keeps bar open)
+      if (open && (hoveredOffice || hoveredPerson)) {
+        if (!e.metaKey && !e.ctrlKey && !e.altKey && e.key !== 'Escape') {
+          dismissPeek();
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, openBar, closeBar, dismissPeek, hoveredOffice, hoveredPerson]);
+
+  function handlePickClick(panel) {
+    dismissPeek();
+    if (activePanel === panel) {
+      setActivePanel(null);
+    } else {
+      setActivePanel(panel);
+      if (panel !== 'shift') setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }
+
+  function handleQueryChange(e) {
+    const v = e.target.value;
+    setQuery(v);
+    if (v.length > 3 && activePanel === null) {
+      setActivePanel('ai');
+    } else if (v.length === 0 && activePanel === 'ai') {
+      setActivePanel(null);
+    }
+  }
+
+  function handleAIAction(action) {
+    if (action === 'Create shift' || action === 'create') {
+      setQuery(''); setActivePanel('shift');
+    } else if (action.includes('availabl') || action.includes('people')) {
+      setQuery(''); setActivePanel('people');
+    } else if (action.includes('office') || action.includes('capacity')) {
+      setQuery(''); setActivePanel('offices');
+    }
+  }
+
+  const isAI = activePanel === 'ai' || (query.length > 3 && activePanel === null);
+  const hasPeek = !!(hoveredOffice || hoveredPerson);
+
+  return (
+    <>
+      {/* Hint bar */}
+      <div className="hint-bar">
+        Press <kbd>⌘K</kbd> to open Lightshot
+      </div>
+
+      {/* Backdrop */}
+      <div
+        ref={backdropRef}
+        className={`ls-backdrop ${open ? 'open' : ''}`}
+        onClick={e => { if (e.target === backdropRef.current) closeBar(); }}
+      >
+        {/* Peek cards — absolute overlay INSIDE the ls-container over the results */}
+        <div className="ls-container" style={{position:'relative'}}>
+          {/* Peek overlay — covers input+picks+results+footer */}
+          {(hoveredOffice || hoveredPerson) && (
+            <div className="peek-wrap">
+              {hoveredOffice && <OfficePeek office={hoveredOffice} onDismiss={dismissPeek} />}
+              {hoveredPerson && !hoveredOffice && <PersonPeek person={hoveredPerson} onDismiss={dismissPeek} />}
+            </div>
+          )}
+          {/* Input row */}
+          <div className="ls-input-row">
+            {isAI ? (
+              <svg className="ls-search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M8 1.5L9.4 5.1L13 5.7L10.5 8.1L11.1 11.7L8 9.9L4.9 11.7L5.5 8.1L3 5.7L6.6 5.1L8 1.5Z" fill="#c4b5fd" stroke="#c4b5fd" strokeWidth="0.5"/>
+              </svg>
+            ) : (
+              <svg className="ls-search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
+                <path d="M10 10.5L13 13.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            )}
+            <input
+              ref={inputRef}
+              className="ls-input"
+              placeholder={
+                activePanel === 'shift' ? "Search offices, people…" :
+                activePanel === 'people' ? "Search people by name or role…" :
+                activePanel === 'offices' ? "Search offices…" :
+                "Search or ask anything…"
+              }
+              value={query}
+              onChange={handleQueryChange}
+              onKeyDown={e => { if (e.key === 'Escape') { if (hasPeek) { e.stopPropagation(); dismissPeek(); } else closeBar(); } }}
+            />
+            {hasPeek
+              ? <kbd className="ls-kbd" style={{color:'#fbbf24', borderColor:'rgba(251,191,36,0.3)'}}>any key closes peek</kbd>
+              : <kbd className="ls-kbd">ESC</kbd>
+            }
+          </div>
+
+          {/* Quick picks */}
+          <div className="ls-quick-picks">
+            <div className={`ls-pick ls-pick-primary ${activePanel === 'shift' ? 'active' : ''}`} onClick={() => handlePickClick('shift')}>
+              <span className="ls-pick-icon shift">
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1.5V9.5M1.5 5.5H9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              </span>
+              Create Shift
+            </div>
+            <div className={`ls-pick ${activePanel === 'people' ? 'active' : ''}`} onClick={() => handlePickClick('people')}>
+              <span className="ls-pick-icon people">
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="3.5" r="2" stroke="currentColor" strokeWidth="1.2"/><path d="M1 9.5C1 7.5 3 6 5.5 6C8 6 10 7.5 10 9.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+              </span>
+              People
+            </div>
+            <div className={`ls-pick ${activePanel === 'offices' ? 'active' : ''}`} onClick={() => handlePickClick('offices')}>
+              <span className="ls-pick-icon offices">
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="1.5" y="3" width="8" height="7" rx="1" stroke="currentColor" strokeWidth="1.2"/><path d="M3.5 3V2a2 2 0 014 0v1" stroke="currentColor" strokeWidth="1.2"/></svg>
+              </span>
+              Offices
+            </div>
+            <div className={`ls-pick ${isAI ? 'active' : ''}`} onClick={() => { setActivePanel('ai'); inputRef.current?.focus(); }}>
+              <span className="ls-pick-icon ai">
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L6.6 3.9L9.5 4.4L7.5 6.3L8 9.2L5.5 7.9L3 9.2L3.5 6.3L1.5 4.4L4.4 3.9L5.5 1Z" fill="currentColor"/></svg>
+              </span>
+              Ask AI
+            </div>
+          </div>
+
+          {/* Panel content */}
+          <div className="ls-results">
+            {activePanel === 'shift' && (
+              <ShiftPanel onClose={closeBar} onSuccess={onSuccess} />
+            )}
+            {activePanel === 'people' && (
+              <PeoplePanel
+                query={query}
+                onPersonHover={p => { setHoveredPerson(p); setHoveredOffice(null); }}
+                onPersonLeave={() => {}}
+              />
+            )}
+            {activePanel === 'offices' && (
+              <OfficesPanel
+                query={query}
+                onOfficeHover={o => { setHoveredOffice(o); setHoveredPerson(null); }}
+                onOfficeLeave={() => {}}
+              />
+            )}
+            {activePanel === 'ai' && query.length > 0 && (
+              <AIPanel query={query} onAction={handleAIAction} />
+            )}
+            {activePanel === 'ai' && query.length === 0 && (
+              <div style={{padding:'16px', color:'var(--ls-muted)', fontSize:13}}>
+                Type anything — e.g. "schedule Alice for tomorrow morning" or "who's available Friday?"
+              </div>
+            )}
+            {activePanel === null && query.length === 0 && (
+              <div style={{padding: '10px 14px 14px'}}>
+                <div className="ls-section-label">Recent</div>
+                {[
+                  {icon:'🏥', title:'2nd Floor', sub:'Viewed 2 min ago', color:'rgba(251,191,36,0.12)'},
+                  {icon:'👤', title:'Andersons, Adam', sub:'Shift created today at 8:00 AM', color:'rgba(110,142,251,0.12)'},
+                  {icon:'📋', title:'Shift — May 4, 2026', sub:'8:00 AM – 4:00 PM · 2nd Floor', color:'rgba(52,211,153,0.12)'},
+                ].map(item => (
+                  <div key={item.title} className="ls-result-item" style={{borderRadius:8}}>
+                    <div className="ls-result-icon" style={{background:item.color, fontSize:14}}>{item.icon}</div>
+                    <div className="ls-result-content">
+                      <div className="ls-result-title">{item.title}</div>
+                      <div className="ls-result-sub">{item.sub}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="ls-footer">
+            <div className="ls-footer-hints">
+              <span className="ls-hint"><kbd className="ls-kbd">↑↓</kbd> Navigate</span>
+              <span className="ls-hint"><kbd className="ls-kbd">↵</kbd> Select</span>
+              <span className="ls-hint"><kbd className="ls-kbd">ESC</kbd> Close</span>
+              {(activePanel === 'people' || activePanel === 'offices') && (
+                <span className="ls-hint" style={{color:'rgba(251,191,36,0.5)'}}>
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{marginRight:2}}>
+                    <path d="M5 1.5C3 1.5 1.5 3 1.5 5S3 8.5 5 8.5 8.5 7 8.5 5 7 1.5 5 1.5Z" stroke="currentColor" strokeWidth="1" fill="none"/>
+                    <path d="M5 4v2M5 6.5v.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+                  </svg>
+                  Hover to preview
+                </span>
+              )}
+            </div>
+            <span style={{fontSize:10, color:'var(--ls-muted)', fontWeight:600, letterSpacing:'0.06em'}}>LIGHTSHOT</span>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── APP SHELL ──
+function AppShell() {
+  const [toast, setToast] = useState(null);
+  const [toastVisible, setToastVisible] = useState(false);
+
+  function showToast(msg) {
+    setToast(msg);
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), 3000);
+  }
+
+  return (
+    <>
+      <div className="app">
+        {/* Announcement */}
+        <div className="topbar-announcement">Exercitationem sed labore et voluptat</div>
+
+        {/* Navbar */}
+        <nav className="navbar">
+          <div className="navbar-logo">⬡TeamBuilder<span>™</span></div>
+          <div className="navbar-nav">
+            {['Home','Schedule','Availability','Reporting','Insights','Insights'].map((n,i) => (
+              <div key={i} className={`nav-item ${i === 1 ? 'active' : ''}`}>{n}</div>
+            ))}
+          </div>
+          <div className="navbar-actions">
+            <div className="navbar-icon">
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="2" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M5 7.5h5M7.5 5v5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+            </div>
+            <div className="navbar-icon">
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 2a5.5 5.5 0 015.5 5.5c0 2.3-.5 3.7-1.5 4.5H4C3 11.2 2 9.8 2 7.5A5.5 5.5 0 017.5 2Z" stroke="currentColor" strokeWidth="1.3"/><path d="M6 13h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+            </div>
+            <div className="navbar-icon">
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="5.5" stroke="currentColor" strokeWidth="1.3"/><path d="M7.5 5v3l2 1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </div>
+            <div className="navbar-avatar">
+              <div className="avatar-circle">SA</div>
+              S.Admin ▾
+            </div>
+          </div>
+        </nav>
+
+        {/* Toolbar */}
+        <div className="toolbar">
+          <div className="view-tabs">
+            {['Month','Week','Day'].map((v,i) => (
+              <div key={v} className={`view-tab ${i === 2 ? 'active' : ''}`}>{v}</div>
+            ))}
+          </div>
+          <div className="select-pill">
+            2nd Floor
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3 4l2 2 2-2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+          </div>
+          <div className="date-nav">
+            <div className="date-nav-arrow">«</div>
+            <div className="date-label">3 May 2026</div>
+            <div className="date-nav-arrow">»</div>
+          </div>
+          <div className="toolbar-right">
+            <div className="icon-btn">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2"/><rect x="7" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2"/><rect x="1" y="7" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2"/><rect x="7" y="7" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2"/></svg>
+            </div>
+            <div className="icon-btn">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1 3h11M1 6.5h11M1 10h11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+            </div>
+            <div className="icon-btn">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1 4h11M3 1v2M10 1v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><rect x="1" y="4" width="11" height="8" rx="1" stroke="currentColor" strokeWidth="1.2"/></svg>
+            </div>
+            <div className="add-shift-btn" onClick={() => {
+              window.dispatchEvent(new KeyboardEvent('keydown', { metaKey: true, key: 'k', bubbles: true }));
+            }}>
+              <span className="add-shift-main">Add shift</span>
+              <span className="add-shift-arrow">▾</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Schedule */}
+        <div className="schedule-area">
+          {/* Time header */}
+          <div className="time-header">
+            <div className="time-cell" style={{borderRight:'1px solid var(--border)'}}></div>
+            {TIMES.map(t => (
+              <div key={t} className="time-cell">{t}</div>
+            ))}
+          </div>
+
+          {/* Rows */}
+          {SCHEDULE_PEOPLE.map((section, si) => (
+            <React.Fragment key={si}>
+              <div className="section-header">
+                <div className="section-label">{section.section}</div>
+                <div className="section-toggle">∧</div>
+              </div>
+              {section.people.map((person, pi) => (
+                <div key={pi} className="person-row">
+                  <div className="person-info">
+                    <div className="person-avatar-row">
+                      <div className="person-circle">{person.name[0]}</div>
+                      <div className="person-name">{person.name}</div>
+                    </div>
+                    <div className="person-role">{person.role}</div>
+                    {person.badge && <div className="person-badge">{person.badge}</div>}
+                  </div>
+                  <div className="shift-timeline" style={{position:'relative'}}>
+                    <div className="shift-block" style={{
+                      left: `${person.shift.start}%`,
+                      width: `${person.shift.end - person.shift.start}%`,
+                    }}>
+                      {person.shift.label}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+
+      {/* Lightshot */}
+      <LightshotBar onSuccess={showToast} />
+
+      {/* Toast */}
+      <div className={`toast ${toastVisible ? 'show' : ''}`}>
+        <div className="toast-dot"></div>
+        {toast}
+      </div>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<AppShell />);
+</script>
+
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 80 56" xmlns="http://www.w3.org/2000/svg">
+    <rect width="80" height="56" fill="#0f111a"/>
+    <rect x="10" y="18" width="60" height="22" rx="6" fill="rgba(110,142,251,0.15)" stroke="rgba(110,142,251,0.4)" strokeWidth="1"/>
+    <rect x="16" y="25" width="36" height="3" rx="1.5" fill="rgba(255,255,255,0.3)"/>
+    <rect x="16" y="31" width="20" height="3" rx="1.5" fill="rgba(110,142,251,0.5)"/>
+  </svg>
+</template>
+</body>
+</html>
