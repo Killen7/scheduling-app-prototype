@@ -1,26 +1,45 @@
-import { createClient } from '@supabase/supabase-js'
+import { getDb } from './db'
 import type { Recommendation, StaffMember } from '@/lib/storage'
+import type {
+  Office,
+  Personnel,
+  PersonnelOffice,
+  PersonnelType,
+  Shift,
+  Tag,
+  Task,
+  Pto,
+  PaginatedResult,
+} from './types'
+import { ValidationError, NotFoundError } from './types'
 
-type OfficeRow = {
-  id: string
-  name: string
-  created_at: string
-}
+// ---------------------------------------------------------------------------
+// Internal row types (Supabase query shapes)
+// ---------------------------------------------------------------------------
+
+type OfficeRow = { id: string; name: string; created_at: string }
 
 type PersonnelRow = {
   id: string
   name: string
-  title: string
-  type: StaffMember['type']
+  title: string | null
+  personnel_type: PersonnelType
   hours_per_week: number | null
 }
 
 type ShiftRow = {
   id: string
-  date: string
-  schedule: string
-  personnel: PersonnelRow | PersonnelRow[]
-  offices: Pick<OfficeRow, 'id' | 'name'> | Pick<OfficeRow, 'id' | 'name'>[]
+  start_at: string
+  end_at: string
+  personnel_offices: {
+    id: string
+    personnel: PersonnelRow | PersonnelRow[]
+    offices: OfficeRow | OfficeRow[]
+  } | {
+    id: string
+    personnel: PersonnelRow | PersonnelRow[]
+    offices: OfficeRow | OfficeRow[]
+  }[]
 }
 
 type RecommendationRow = {
@@ -74,26 +93,42 @@ function toArrayValue<T>(value: T | T[]): T {
   return Array.isArray(value) ? value[0] : value
 }
 
-function getPersonnelCategory(type: StaffMember['type']) {
+function getPersonnelCategory(type: PersonnelType) {
   if (type === 'provider') return 1
   if (type === 'non-clinical') return 2
   return 3
 }
 
-function getPersonnelLabel(type: StaffMember['type']) {
+function getPersonnelLabel(type: PersonnelType) {
   if (type === 'provider') return 'Providers'
   if (type === 'non-clinical') return 'Non-Clinical Staff'
   return 'Clinical Staff'
 }
 
-function buildDateTime(date: string, time: string) {
-  return `${date}T${time}`
+/** Format an ISO timestamptz to "8:00 AM" display string */
+function formatTimeDisplay(iso: string): string {
+  const d = new Date(iso)
+  let h = d.getUTCHours()
+  const m = d.getUTCMinutes()
+  const ampm = h >= 12 ? 'PM' : 'AM'
+  if (h > 12) h -= 12
+  if (h === 0) h = 12
+  return `${h}:${String(m).padStart(2, '0')} ${ampm}`
 }
 
-function parseSchedule(schedule: string) {
-  const [beginTime, endTime] = schedule.split(' - ')
-  return { beginTime, endTime }
+/** Convert start_at / end_at ISO strings to "8:00 AM - 4:00 PM" */
+export function toScheduleString(startAt: string, endAt: string): string {
+  return `${formatTimeDisplay(startAt)} - ${formatTimeDisplay(endAt)}`
 }
+
+/** Extract YYYY-MM-DD date part from ISO string (UTC) */
+export function toDate(iso: string): string {
+  return iso.slice(0, 10)
+}
+
+// ---------------------------------------------------------------------------
+// Legacy functions (kept for backward compatibility)
+// ---------------------------------------------------------------------------
 
 function parseTimeToMinutes(value: string) {
   const match = value.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
@@ -201,7 +236,7 @@ function pickBestMatch<T extends { id: string }>(
 }
 
 export async function getOffices() {
-  const supabase = getSupabase()
+  const supabase = getDb()
   const { data, error } = await supabase
     .from('offices')
     .select('id, name, created_at')
@@ -232,20 +267,17 @@ export async function getOffices() {
     endTimeDisplay: '11:59 PM',
   }))
 
-  return {
-    totalCount: items.length,
-    items,
-  }
+  return { totalCount: items.length, items }
 }
 
 export async function getStaffMembers(searchParams: URLSearchParams) {
-  const supabase = getSupabase()
+  const supabase = getDb()
   const skipCount = Number(searchParams.get('SkipCount') ?? 0)
   const maxResultCount = Number(searchParams.get('MaxResultCount') ?? 1000)
 
   const { data, error, count } = await supabase
     .from('personnel')
-    .select('id, name, title, type, hours_per_week', { count: 'exact' })
+    .select('id, name, title, personnel_type, hours_per_week', { count: 'exact' })
     .order('name')
     .range(skipCount, skipCount + maxResultCount - 1)
     .returns<PersonnelRow[]>()
@@ -257,11 +289,11 @@ export async function getStaffMembers(searchParams: URLSearchParams) {
     skipCount,
     sorting: searchParams.get('Sorting'),
     id: person.id,
-    personnelType: person.type,
-    personnelTypeCategoryId: getPersonnelCategory(person.type),
+    personnelType: person.personnel_type,
+    personnelTypeCategoryId: getPersonnelCategory(person.personnel_type),
     staffRole: person.title,
     availabilities: [],
-    userType: [person.type],
+    userType: [person.personnel_type],
     name: person.name,
     surName: null,
     email: null,
@@ -269,46 +301,48 @@ export async function getStaffMembers(searchParams: URLSearchParams) {
     userId: person.id,
   }))
 
-  return {
-    totalCount: count ?? items.length,
-    items,
-  }
+  return { totalCount: count ?? items.length, items }
 }
 
 export async function getScheduleV2(searchParams: URLSearchParams) {
-  const supabase = getSupabase()
+  const supabase = getDb()
   const officeIds = searchParams.getAll('OfficeIds')
   const beginDate = searchParams.get('BeginDate')?.slice(0, 10)
   const endDate = searchParams.get('EndDate')?.slice(0, 10)
 
   let query = supabase
     .from('shifts')
-    .select('id, date, schedule, personnel(id, name, title, type, hours_per_week), offices(id, name)')
+    .select(
+      'id, start_at, end_at, personnel_offices!inner(id, personnel(id, name, title, personnel_type, hours_per_week), offices(id, name))'
+    )
 
-  if (officeIds.length > 0) query = query.in('office_id', officeIds)
-  if (beginDate) query = query.gte('date', beginDate)
-  if (endDate) query = query.lte('date', endDate)
+  if (officeIds.length > 0) {
+    query = query.in('personnel_offices.office_id', officeIds)
+  }
+  if (beginDate) query = query.gte('start_at', `${beginDate}T00:00:00Z`)
+  if (endDate) query = query.lte('start_at', `${endDate}T23:59:59Z`)
 
-  const { data, error } = await query.order('date').returns<ShiftRow[]>()
+  const { data, error } = await query.order('start_at').returns<ShiftRow[]>()
   if (error) throw error
 
   const staff: StaffMember[] = (data ?? []).map((shift) => {
-    const person = toArrayValue(shift.personnel)
-    const office = toArrayValue(shift.offices)
+    const po = toArrayValue(shift.personnel_offices)
+    const person = toArrayValue(po.personnel)
+    const office = toArrayValue(po.offices)
 
     return {
       id: shift.id,
       name: person.name,
-      title: person.title,
-      type: person.type,
+      title: person.title ?? '',
+      type: person.personnel_type,
       hoursPerWeek: person.hours_per_week ?? undefined,
-      schedule: shift.schedule,
+      schedule: toScheduleString(shift.start_at, shift.end_at),
       location: office.name,
-      date: shift.date,
+      date: toDate(shift.start_at),
     }
   })
 
-  const groups = new Map<StaffMember['type'], {
+  const groups = new Map<PersonnelType, {
     personnelTypeId: string
     personnelTypeCategoryId: number
     personnelTypeName: string
@@ -318,22 +352,24 @@ export async function getScheduleV2(searchParams: URLSearchParams) {
   }>()
 
   for (const shift of data ?? []) {
-    const person = toArrayValue(shift.personnel)
-    const office = toArrayValue(shift.offices)
-    const { beginTime, endTime } = parseSchedule(shift.schedule)
+    const po = toArrayValue(shift.personnel_offices)
+    const person = toArrayValue(po.personnel)
+    const office = toArrayValue(po.offices)
+    const scheduleStr = toScheduleString(shift.start_at, shift.end_at)
+    const dateStr = toDate(shift.start_at)
 
-    if (!groups.has(person.type)) {
-      groups.set(person.type, {
-        personnelTypeId: person.type,
-        personnelTypeCategoryId: getPersonnelCategory(person.type),
-        personnelTypeName: getPersonnelLabel(person.type),
-        schedulePositionIndex: getPersonnelCategory(person.type),
-        scheduleGroupAlias: getPersonnelLabel(person.type),
+    if (!groups.has(person.personnel_type)) {
+      groups.set(person.personnel_type, {
+        personnelTypeId: person.personnel_type,
+        personnelTypeCategoryId: getPersonnelCategory(person.personnel_type),
+        personnelTypeName: getPersonnelLabel(person.personnel_type),
+        schedulePositionIndex: getPersonnelCategory(person.personnel_type),
+        scheduleGroupAlias: getPersonnelLabel(person.personnel_type),
         items: [],
       })
     }
 
-    groups.get(person.type)?.items.push({
+    groups.get(person.personnel_type)?.items.push({
       appUserId: person.id,
       externalProviderId: null,
       externalProviderIdEhr: null,
@@ -342,20 +378,17 @@ export async function getScheduleV2(searchParams: URLSearchParams) {
       personnelId: person.id,
       secondaryPersonnelId: null,
       isDeletedUser: false,
-      personnelTypeId: person.type,
+      personnelTypeId: person.personnel_type,
       providerLicenseId: null,
       providerSpecialtyId: null,
       staffRoleId: null,
       shiftRequests: [
         {
           id: shift.id,
-          beginDate: buildDateTime(shift.date, beginTime),
-          endDate: buildDateTime(shift.date, endTime),
-          office: {
-            id: office.id,
-            name: office.name,
-          },
-          schedule: shift.schedule,
+          beginDate: shift.start_at,
+          endDate: shift.end_at,
+          office: { id: office.id, name: office.name },
+          schedule: scheduleStr,
         },
       ],
       unavailabilities: [],
@@ -365,14 +398,12 @@ export async function getScheduleV2(searchParams: URLSearchParams) {
   return {
     items: Array.from(groups.values()),
     mySchedule: [],
-    demo: {
-      staff,
-    },
+    demo: { staff },
   }
 }
 
 export async function getRecommendationItems(searchParams: URLSearchParams) {
-  const supabase = getSupabase()
+  const supabase = getDb()
   const officeId = searchParams.get('officeId')
   const evaluationDate = searchParams.get('evaluationTime')?.slice(0, 10)
   const beginDate = searchParams.get('BeginDate')?.slice(0, 10)
@@ -396,7 +427,6 @@ export async function getRecommendationItems(searchParams: URLSearchParams) {
     recommendationRole: string
   } => {
     const office = toArrayValue(recommendation.offices)
-
     return {
       id: recommendation.id,
       role: recommendation.role,
@@ -409,6 +439,506 @@ export async function getRecommendationItems(searchParams: URLSearchParams) {
       recommendationRole: recommendation.role,
     }
   })
+}
+
+// ---------------------------------------------------------------------------
+// Personnel CRUD
+// ---------------------------------------------------------------------------
+
+export async function listPersonnel(params?: {
+  skip?: number
+  take?: number
+}): Promise<PaginatedResult<Personnel>> {
+  const supabase = getDb()
+  const skip = params?.skip ?? 0
+  const take = params?.take ?? 1000
+
+  const { data, error, count } = await supabase
+    .from('personnel')
+    .select('*', { count: 'exact' })
+    .order('name')
+    .range(skip, skip + take - 1)
+
+  if (error) throw error
+  return { totalCount: count ?? 0, items: data ?? [] }
+}
+
+export async function getPersonnelById(id: string): Promise<Personnel> {
+  const supabase = getDb()
+  const { data, error } = await supabase
+    .from('personnel')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (error) throw error
+  if (!data) throw new NotFoundError('Personnel', id)
+  return data
+}
+
+export async function createPersonnel(body: {
+  name: string
+  personnel_type: PersonnelType
+  title?: string
+  hours_per_week?: number
+}): Promise<Personnel> {
+  const supabase = getDb()
+  const { data, error } = await supabase
+    .from('personnel')
+    .insert(body)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function updatePersonnel(
+  id: string,
+  body: Partial<{ name: string; personnel_type: PersonnelType; title: string; hours_per_week: number }>
+): Promise<Personnel> {
+  const supabase = getDb()
+  const { data, error } = await supabase
+    .from('personnel')
+    .update(body)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  if (!data) throw new NotFoundError('Personnel', id)
+  return data
+}
+
+export async function deletePersonnel(id: string): Promise<void> {
+  const supabase = getDb()
+  const { error } = await supabase.from('personnel').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ---------------------------------------------------------------------------
+// Offices CRUD
+// ---------------------------------------------------------------------------
+
+export async function listOfficeEntities(params?: {
+  skip?: number
+  take?: number
+}): Promise<PaginatedResult<Office>> {
+  const supabase = getDb()
+  const skip = params?.skip ?? 0
+  const take = params?.take ?? 1000
+
+  const { data, error, count } = await supabase
+    .from('offices')
+    .select('*', { count: 'exact' })
+    .order('name')
+    .range(skip, skip + take - 1)
+
+  if (error) throw error
+  return { totalCount: count ?? 0, items: data ?? [] }
+}
+
+export async function getOfficeById(id: string): Promise<Office> {
+  const supabase = getDb()
+  const { data, error } = await supabase
+    .from('offices')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (error) throw error
+  if (!data) throw new NotFoundError('Office', id)
+  return data
+}
+
+export async function createOffice(body: { name: string }): Promise<Office> {
+  const supabase = getDb()
+  const { data, error } = await supabase
+    .from('offices')
+    .insert(body)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function updateOffice(id: string, body: { name: string }): Promise<Office> {
+  const supabase = getDb()
+  const { data, error } = await supabase
+    .from('offices')
+    .update(body)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  if (!data) throw new NotFoundError('Office', id)
+  return data
+}
+
+export async function deleteOffice(id: string): Promise<void> {
+  const supabase = getDb()
+  const { error } = await supabase.from('offices').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ---------------------------------------------------------------------------
+// PersonnelOffices CRUD
+// ---------------------------------------------------------------------------
+
+export async function listPersonnelOffices(params?: {
+  personnel_id?: string
+  office_id?: string
+  skip?: number
+  take?: number
+}): Promise<PaginatedResult<PersonnelOffice>> {
+  const supabase = getDb()
+  const skip = params?.skip ?? 0
+  const take = params?.take ?? 1000
+
+  let query = supabase
+    .from('personnel_offices')
+    .select('*, personnel(*), offices(*)', { count: 'exact' })
+    .order('created_at')
+    .range(skip, skip + take - 1)
+
+  if (params?.personnel_id) query = query.eq('personnel_id', params.personnel_id)
+  if (params?.office_id) query = query.eq('office_id', params.office_id)
+
+  const { data, error, count } = await query
+  if (error) throw error
+  return { totalCount: count ?? 0, items: data ?? [] }
+}
+
+export async function createPersonnelOffice(body: {
+  personnel_id: string
+  office_id: string
+}): Promise<PersonnelOffice> {
+  const supabase = getDb()
+  const { data, error } = await supabase
+    .from('personnel_offices')
+    .insert(body)
+    .select('*, personnel(*), offices(*)')
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function deletePersonnelOffice(id: string): Promise<void> {
+  const supabase = getDb()
+  const { error } = await supabase.from('personnel_offices').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ---------------------------------------------------------------------------
+// Shifts CRUD
+// ---------------------------------------------------------------------------
+
+export async function listShifts(params?: {
+  personnel_office_id?: string
+  office_id?: string
+  begin_date?: string
+  end_date?: string
+  skip?: number
+  take?: number
+}): Promise<PaginatedResult<Shift>> {
+  const supabase = getDb()
+  const skip = params?.skip ?? 0
+  const take = params?.take ?? 1000
+
+  let query = supabase
+    .from('shifts')
+    .select(
+      '*, personnel_offices(*, personnel(*), offices(*)), shift_tags(*, tags(*)), shift_tasks(*, tasks(*))',
+      { count: 'exact' }
+    )
+    .order('start_at')
+    .range(skip, skip + take - 1)
+
+  if (params?.personnel_office_id)
+    query = query.eq('personnel_office_id', params.personnel_office_id)
+  if (params?.begin_date) query = query.gte('start_at', `${params.begin_date}T00:00:00Z`)
+  if (params?.end_date) query = query.lte('start_at', `${params.end_date}T23:59:59Z`)
+
+  const { data, error, count } = await query
+  if (error) throw error
+
+  const items = (data ?? []).map((row: Record<string, unknown>) => ({
+    ...row,
+    tags: (row.shift_tags as { tags: Tag }[] | null)?.map((st) => st.tags) ?? [],
+  }))
+
+  return { totalCount: count ?? 0, items: items as Shift[] }
+}
+
+export async function getShiftById(id: string): Promise<Shift> {
+  const supabase = getDb()
+  const { data, error } = await supabase
+    .from('shifts')
+    .select('*, personnel_offices(*, personnel(*), offices(*)), shift_tags(*, tags(*)), shift_tasks(*, tasks(*))')
+    .eq('id', id)
+    .single()
+
+  if (error) throw error
+  if (!data) throw new NotFoundError('Shift', id)
+
+  const row = data as Record<string, unknown>
+  return {
+    ...row,
+    tags: (row.shift_tags as { tags: Tag }[] | null)?.map((st) => st.tags) ?? [],
+  } as Shift
+}
+
+export async function createShift(body: {
+  personnel_office_id: string
+  start_at: string
+  end_at: string
+}): Promise<Shift> {
+  const supabase = getDb()
+  const { data, error } = await supabase
+    .from('shifts')
+    .insert(body)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function updateShift(
+  id: string,
+  body: Partial<{ personnel_office_id: string; start_at: string; end_at: string }>
+): Promise<Shift> {
+  const supabase = getDb()
+  const { data, error } = await supabase
+    .from('shifts')
+    .update(body)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  if (!data) throw new NotFoundError('Shift', id)
+  return data
+}
+
+export async function deleteShift(id: string): Promise<void> {
+  const supabase = getDb()
+  const { error } = await supabase.from('shifts').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function addTagToShift(shiftId: string, tagId: string) {
+  const supabase = getDb()
+  const { data, error } = await supabase
+    .from('shift_tags')
+    .insert({ shift_id: shiftId, tag_id: tagId })
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function removeTagFromShift(shiftId: string, tagId: string): Promise<void> {
+  const supabase = getDb()
+  const { error } = await supabase
+    .from('shift_tags')
+    .delete()
+    .eq('shift_id', shiftId)
+    .eq('tag_id', tagId)
+
+  if (error) throw error
+}
+
+export async function addTaskToShift(
+  shiftId: string,
+  body: { task_id: string; provider_shift_id?: string }
+) {
+  const supabase = getDb()
+
+  const { data: task, error: taskErr } = await supabase
+    .from('tasks')
+    .select('is_provider_attached')
+    .eq('id', body.task_id)
+    .single()
+
+  if (taskErr) throw taskErr
+  if (task?.is_provider_attached && !body.provider_shift_id) {
+    throw new ValidationError('provider_shift_id is required for provider-attached tasks')
+  }
+
+  const { data, error } = await supabase
+    .from('shift_tasks')
+    .insert({ shift_id: shiftId, ...body })
+    .select('*, tasks(*)')
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function removeTaskFromShift(shiftTaskId: string): Promise<void> {
+  const supabase = getDb()
+  const { error } = await supabase.from('shift_tasks').delete().eq('id', shiftTaskId)
+  if (error) throw error
+}
+
+// ---------------------------------------------------------------------------
+// Tags CRUD
+// ---------------------------------------------------------------------------
+
+export async function listTags(): Promise<Tag[]> {
+  const supabase = getDb()
+  const { data, error } = await supabase.from('tags').select('*').order('name')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function createTag(body: { name: string }): Promise<Tag> {
+  const supabase = getDb()
+  const { data, error } = await supabase.from('tags').insert(body).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteTag(id: string): Promise<void> {
+  const supabase = getDb()
+  const { error } = await supabase.from('tags').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ---------------------------------------------------------------------------
+// Tasks CRUD
+// ---------------------------------------------------------------------------
+
+export async function listTasks(): Promise<Task[]> {
+  const supabase = getDb()
+  const { data, error } = await supabase.from('tasks').select('*').order('name')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function getTaskById(id: string): Promise<Task> {
+  const supabase = getDb()
+  const { data, error } = await supabase.from('tasks').select('*').eq('id', id).single()
+  if (error) throw error
+  if (!data) throw new NotFoundError('Task', id)
+  return data
+}
+
+export async function createTask(body: {
+  name: string
+  is_provider_attached?: boolean
+}): Promise<Task> {
+  const supabase = getDb()
+  const { data, error } = await supabase.from('tasks').insert(body).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function updateTask(
+  id: string,
+  body: Partial<{ name: string; is_provider_attached: boolean }>
+): Promise<Task> {
+  const supabase = getDb()
+  const { data, error } = await supabase
+    .from('tasks')
+    .update(body)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  if (!data) throw new NotFoundError('Task', id)
+  return data
+}
+
+export async function deleteTask(id: string): Promise<void> {
+  const supabase = getDb()
+  const { error } = await supabase.from('tasks').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ---------------------------------------------------------------------------
+// PTO CRUD
+// ---------------------------------------------------------------------------
+
+export async function listPto(params?: {
+  personnel_id?: string
+  begin_date?: string
+  end_date?: string
+  skip?: number
+  take?: number
+}): Promise<PaginatedResult<Pto>> {
+  const supabase = getDb()
+  const skip = params?.skip ?? 0
+  const take = params?.take ?? 1000
+
+  let query = supabase
+    .from('pto')
+    .select('*, personnel(*)', { count: 'exact' })
+    .order('start_at')
+    .range(skip, skip + take - 1)
+
+  if (params?.personnel_id) query = query.eq('personnel_id', params.personnel_id)
+  if (params?.begin_date) query = query.gte('start_at', `${params.begin_date}T00:00:00Z`)
+  if (params?.end_date) query = query.lte('start_at', `${params.end_date}T23:59:59Z`)
+
+  const { data, error, count } = await query
+  if (error) throw error
+  return { totalCount: count ?? 0, items: data ?? [] }
+}
+
+export async function getPtoById(id: string): Promise<Pto> {
+  const supabase = getDb()
+  const { data, error } = await supabase
+    .from('pto')
+    .select('*, personnel(*)')
+    .eq('id', id)
+    .single()
+
+  if (error) throw error
+  if (!data) throw new NotFoundError('Pto', id)
+  return data
+}
+
+export async function createPto(body: {
+  personnel_id: string
+  name: string
+  reason?: string
+  start_at: string
+  end_at: string
+}): Promise<Pto> {
+  const supabase = getDb()
+  const { data, error } = await supabase.from('pto').insert(body).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function updatePto(
+  id: string,
+  body: Partial<{ name: string; reason: string; start_at: string; end_at: string }>
+): Promise<Pto> {
+  const supabase = getDb()
+  const { data, error } = await supabase
+    .from('pto')
+    .update(body)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  if (!data) throw new NotFoundError('Pto', id)
+  return data
+}
+
+export async function deletePto(id: string): Promise<void> {
+  const supabase = getDb()
+  const { error } = await supabase.from('pto').delete().eq('id', id)
+  if (error) throw error
 }
 
 export async function getStaffAvailability(input: StaffAvailabilityInput) {

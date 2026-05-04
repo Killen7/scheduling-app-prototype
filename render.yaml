@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: scheduling-app
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
