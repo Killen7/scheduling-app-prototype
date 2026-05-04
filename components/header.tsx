@@ -3,7 +3,6 @@
 import { Menu, Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LightshotBar } from '@/components/lightshot/LightshotBar'
-import { Spotlight } from '@/components/spotlight'
 import {
   Sheet,
   SheetContent,
@@ -14,10 +13,9 @@ import {
 
 interface HeaderProps {
   onMenuClick?: () => void
-  onShiftCreatedSuccess?: () => Promise<void> | void
 }
 
-export function Header({ onMenuClick, onShiftCreatedSuccess }: HeaderProps) {
+export function Header({ onMenuClick }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b bg-background px-4">
       <Sheet>
@@ -57,7 +55,6 @@ export function Header({ onMenuClick, onShiftCreatedSuccess }: HeaderProps) {
 
       <div className="flex items-center gap-2">
         <LightshotBar />
-        <Spotlight onShiftCreatedSuccess={onShiftCreatedSuccess} />
         <Button variant="ghost" size="icon">
           <Bell className="size-5" />
           <span className="sr-only">Notifications</span>

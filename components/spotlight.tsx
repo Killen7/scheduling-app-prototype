@@ -1,259 +1,15 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { Building2, CalendarIcon, Search, UserRound } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { CalendarIcon, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   CommandDialog,
-  CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
 } from '@/components/ui/command'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { formatHour, getDailyHours, parseScheduleToMinutes } from '@/lib/schedule-utils'
-import type { Recommendation, StaffMember } from '@/lib/storage'
-import { LOCATIONS, loadRecommendations, loadStaff } from '@/lib/storage'
-
-const PREVIEW_HOUR_WIDTH = 60
-const PREVIEW_ROW_HEIGHT = 60
-const PREVIEW_PILL_HEIGHT = 50
-
-type JsonRpcResponse = {
-  jsonrpc: '2.0'
-  id: string | number | null
-  result?: unknown
-  error?: {
-    code: number
-    message: string
-  }
-}
-
-type ShiftDraft = {
-  officeNameOrId: string
-  staffNameOrId: string
-  date: string
-  schedule: string
-}
-
-type AnalyzeShiftPayload = {
-  intent?: 'create_shift' | 'none'
-  parsed?: {
-    officeQuery?: string | null
-    staffQuery?: string | null
-    date?: string | null
-    schedule?: string | null
-  }
-  missingFields?: string[]
-}
-
-async function callMcpTool(name: string, args: Record<string, unknown>) {
-  const response = await fetch('/api/mcp', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: crypto.randomUUID(),
-      method: 'tools/call',
-      params: {
-        name,
-        arguments: args,
-      },
-    }),
-  })
-
-  return (await response.json()) as JsonRpcResponse
-}
-
-function parseToolPayload(response: JsonRpcResponse): unknown {
-  if (!response.result || typeof response.result !== 'object') return null
-  const resultRecord = response.result as { content?: Array<{ type?: string; text?: string }> }
-  const text = resultRecord.content?.find((item) => item.type === 'text')?.text
-  if (!text) return null
-  try {
-    return JSON.parse(text)
-  } catch {
-    return text
-  }
-}
-
-function getPillColor(type: StaffMember['type'] | 'recommendation') {
-  if (type === 'provider') return 'bg-[#ebeef0] text-gray-900'
-  if (type === 'recommendation') return 'bg-red-100 text-red-800 border border-red-200'
-  return 'bg-[#ddebff] text-[#1f3b6b]'
-}
-
-function getPreviewPillStyle(schedule: string): { left: number; width: number } {
-  const { startMinutes, durationMinutes } = parseScheduleToMinutes(schedule)
-  return {
-    left: (startMinutes / 60) * PREVIEW_HOUR_WIDTH,
-    width: Math.max((durationMinutes / 60) * PREVIEW_HOUR_WIDTH, PREVIEW_HOUR_WIDTH / 2),
-  }
-}
-
-function getTopPeople() {
-  const staff = loadStaff()
-  const uniqueNames = new Set<string>()
-  const people: string[] = []
-
-  for (const member of staff) {
-    if (uniqueNames.has(member.name)) continue
-    uniqueNames.add(member.name)
-    people.push(member.name)
-    if (people.length === 3) break
-  }
-
-  return people
-}
-
-function formatDateLabel(value: string) {
-  const [year, month, day] = value.split('-')
-  const date = new Date(`${value}T00:00:00`)
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-  return `${days[date.getDay()]} ${month}/${day}/${year}`
-}
-
-function buildOfficePreviewRows(staff: StaffMember[], office: string, date: string) {
-  const grouped = new Map<string, StaffMember>()
-  const filtered = staff.filter((member) => member.location === office && member.date === date)
-
-  for (const member of filtered) {
-    const key = `${member.name}::${member.title}::${member.type}`
-    if (!grouped.has(key)) grouped.set(key, member)
-  }
-
-  return Array.from(grouped.values()).sort((a, b) => a.name.localeCompare(b.name))
-}
-
-function getOfficeDates(staff: StaffMember[], recommendations: Recommendation[], office: string) {
-  const dates = [
-    ...staff.filter((member) => member.location === office).map((member) => member.date),
-    ...recommendations.filter((recommendation) => recommendation.location === office).map((recommendation) => recommendation.date),
-  ]
-  return Array.from(new Set(dates)).sort()
-}
-
-function getTodayDate() {
-  const today = new Date()
-  const year = today.getFullYear()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
-  const day = String(today.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function MiniSchedulePreview({
-  office,
-  selectedDate,
-  staff,
-  recommendations,
-}: {
-  office: string
-  selectedDate: string
-  staff: StaffMember[]
-  recommendations: Recommendation[]
-}) {
-  const rows = buildOfficePreviewRows(staff, office, selectedDate)
-  const recommendationSlots = recommendations
-    .filter((recommendation) => recommendation.location === office && recommendation.date === selectedDate)
-    .flatMap((recommendation) => recommendation.slots)
-  const hours = getDailyHours()
-  const gridWidth = hours.length * PREVIEW_HOUR_WIDTH
-
-  if (rows.length === 0 && recommendationSlots.length === 0) {
-    return <p className="px-4 py-6 text-sm text-gray-500">No schedule data available for this office.</p>
-  }
-
-  return (
-    <div className="max-h-[420px] overflow-auto">
-      <div className="min-w-max">
-        <div className="flex border-b border-gray-200">
-          <div className="sticky left-0 z-10 flex w-48 shrink-0 items-center border-r border-gray-200 bg-white px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600">
-            Person
-          </div>
-          <div className="flex" style={{ width: gridWidth }}>
-            {hours.map((hour) => (
-              <div
-                key={hour}
-                className="flex items-center justify-center border-r border-gray-200 text-[10px] font-semibold text-gray-500"
-                style={{ width: PREVIEW_HOUR_WIDTH, minWidth: PREVIEW_HOUR_WIDTH, height: 28 }}
-              >
-                {formatHour(hour)}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {recommendationSlots.length > 0 && (
-          <div className="flex border-b border-gray-200">
-            <div className="sticky left-0 z-10 flex w-48 shrink-0 items-center border-r border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-900">
-              Recommendations
-            </div>
-            <div className="relative" style={{ width: gridWidth, height: PREVIEW_ROW_HEIGHT }}>
-              <div className="absolute inset-0 flex">
-                {hours.map((hour) => (
-                  <div key={`recommendation-${hour}`} className="h-full border-r border-gray-200" style={{ width: PREVIEW_HOUR_WIDTH, minWidth: PREVIEW_HOUR_WIDTH }} />
-                ))}
-              </div>
-              {recommendationSlots.map((slot, index) => {
-                const style = getPreviewPillStyle(slot)
-                return (
-                  <div
-                    key={`${slot}-${index}`}
-                    className={`absolute top-1/2 flex -translate-y-1/2 items-center overflow-hidden rounded-[8px] px-2 text-[10px] font-medium ${getPillColor('recommendation')}`}
-                    style={{
-                      left: style.left,
-                      width: style.width,
-                      height: PREVIEW_PILL_HEIGHT,
-                      transform: `translateY(calc(-50% + ${index * 2}px))`,
-                    }}
-                  >
-                    {slot}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {rows.map((row) => (
-          <div key={row.id} className="flex border-b border-gray-200">
-            <div className="sticky left-0 z-10 flex w-48 shrink-0 flex-col justify-center border-r border-gray-200 bg-white px-3 py-2">
-              <p className="truncate text-xs font-medium text-gray-900">{row.name}</p>
-              <p className="truncate text-[10px] text-gray-500">{row.title}</p>
-            </div>
-            <div className="relative" style={{ width: gridWidth, height: PREVIEW_ROW_HEIGHT }}>
-              <div className="absolute inset-0 flex">
-                {hours.map((hour) => (
-                  <div key={`${row.id}-${hour}`} className="h-full border-r border-gray-200" style={{ width: PREVIEW_HOUR_WIDTH, minWidth: PREVIEW_HOUR_WIDTH }} />
-                ))}
-              </div>
-              <div
-                className={`absolute top-1/2 flex -translate-y-1/2 items-center overflow-hidden rounded-[8px] px-2 text-[10px] font-medium ${getPillColor(row.type)}`}
-                style={{
-                  ...getPreviewPillStyle(row.schedule),
-                  height: PREVIEW_PILL_HEIGHT,
-                }}
-              >
-                {row.schedule}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 interface SpotlightProps {
   onShiftCreatedSuccess?: () => Promise<void> | void
@@ -261,23 +17,8 @@ interface SpotlightProps {
 
 export function Spotlight({ onShiftCreatedSuccess }: SpotlightProps) {
   const [open, setOpen] = useState(false)
-  const [previewOffice, setPreviewOffice] = useState<string | null>(null)
-  const [previewDate, setPreviewDate] = useState('')
   const [query, setQuery] = useState('')
-  const [showCreateShiftForm, setShowCreateShiftForm] = useState(false)
-  const [shiftDraft, setShiftDraft] = useState<ShiftDraft>({
-    officeNameOrId: '',
-    staffNameOrId: '',
-    date: '',
-    schedule: '',
-  })
-  const [shiftActionLoading, setShiftActionLoading] = useState(false)
-  const [shiftActionMessage, setShiftActionMessage] = useState<string | null>(null)
-
-  const offices = useMemo(() => LOCATIONS.slice(0, 3), [])
-  const people = useMemo(() => getTopPeople(), [])
-  const staff = useMemo(() => loadStaff(), [])
-  const recommendations = useMemo(() => loadRecommendations(), [])
+  const shouldShowCreateShift = query.trim().toLowerCase().startsWith('create')
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -292,83 +33,10 @@ export function Spotlight({ onShiftCreatedSuccess }: SpotlightProps) {
   }, [])
 
   useEffect(() => {
-    if (!open) setPreviewOffice(null)
-  }, [open])
-
-  useEffect(() => {
     if (!open) {
       setQuery('')
-      setShowCreateShiftForm(false)
-      setShiftActionMessage(null)
     }
   }, [open])
-
-  useEffect(() => {
-    if (!previewOffice) {
-      setPreviewDate('')
-      return
-    }
-
-    const availableDates = getOfficeDates(staff, recommendations, previewOffice)
-    const todayDate = getTodayDate()
-
-    if (availableDates.includes(todayDate)) {
-      setPreviewDate(todayDate)
-      return
-    }
-
-    setPreviewDate(availableDates[0] ?? '')
-  }, [previewOffice, staff, recommendations])
-
-  useEffect(() => {
-    if (!open || query.trim().length < 8) return
-
-    const timeoutId = window.setTimeout(async () => {
-      const analysis = await callMcpTool('analyze_shift_request', { requestText: query })
-      if (analysis.error) return
-
-      const payload = parseToolPayload(analysis) as AnalyzeShiftPayload | null
-      if (!payload || payload.intent !== 'create_shift') return
-
-      setShowCreateShiftForm(true)
-      setShiftDraft((current) => ({
-        officeNameOrId: payload.parsed?.officeQuery ?? current.officeNameOrId,
-        staffNameOrId: payload.parsed?.staffQuery ?? current.staffNameOrId,
-        date: payload.parsed?.date ?? current.date,
-        schedule: payload.parsed?.schedule ?? current.schedule,
-      }))
-    }, 250)
-
-    return () => window.clearTimeout(timeoutId)
-  }, [open, query])
-
-  const createShiftFromDraft = async () => {
-    setShiftActionLoading(true)
-    setShiftActionMessage(null)
-    try {
-      const response = await callMcpTool('create_shift', {
-        officeNameOrId: shiftDraft.officeNameOrId,
-        staffNameOrId: shiftDraft.staffNameOrId,
-        date: shiftDraft.date,
-        schedule: shiftDraft.schedule,
-      })
-
-      if (response.error) {
-        setShiftActionMessage(response.error.message)
-        return
-      }
-
-      const payload = parseToolPayload(response) as { ok?: boolean } | null
-      if (payload?.ok) {
-        setShiftActionMessage('Shift created successfully.')
-        await onShiftCreatedSuccess?.()
-      } else {
-        setShiftActionMessage('Shift could not be created.')
-      }
-    } finally {
-      setShiftActionLoading(false)
-    }
-  }
 
   return (
     <>
@@ -392,154 +60,25 @@ export function Spotlight({ onShiftCreatedSuccess }: SpotlightProps) {
         <CommandInput
           value={query}
           onValueChange={setQuery}
-          placeholder="Search offices, people, or write: create shift for..."
+          placeholder="Search..."
         />
-        {showCreateShiftForm && (
-          <div className="border-b px-3 py-3">
-            <p className="mb-2 text-xs font-semibold text-neutral-800">Create Shift</p>
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-              <input
-                value={shiftDraft.officeNameOrId}
-                onChange={(event) =>
-                  setShiftDraft((current) => ({ ...current, officeNameOrId: event.target.value }))
-                }
-                placeholder="Office name or ID"
-                className="rounded-md border border-gray-300 px-2 py-1.5 text-xs"
-              />
-              <input
-                value={shiftDraft.staffNameOrId}
-                onChange={(event) =>
-                  setShiftDraft((current) => ({ ...current, staffNameOrId: event.target.value }))
-                }
-                placeholder="Staff name or ID"
-                className="rounded-md border border-gray-300 px-2 py-1.5 text-xs"
-              />
-              <input
-                value={shiftDraft.date}
-                onChange={(event) =>
-                  setShiftDraft((current) => ({ ...current, date: event.target.value }))
-                }
-                placeholder="YYYY-MM-DD"
-                className="rounded-md border border-gray-300 px-2 py-1.5 text-xs"
-              />
-              <input
-                value={shiftDraft.schedule}
-                onChange={(event) =>
-                  setShiftDraft((current) => ({ ...current, schedule: event.target.value }))
-                }
-                placeholder="h:mm AM - h:mm PM"
-                className="rounded-md border border-gray-300 px-2 py-1.5 text-xs"
-              />
-            </div>
-            <div className="mt-2 flex items-center gap-2">
-              <Button size="sm" onClick={createShiftFromDraft} disabled={shiftActionLoading}>
-                {shiftActionLoading ? 'Creating...' : 'Create shift'}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowCreateShiftForm(false)}
-                disabled={shiftActionLoading}
+        {shouldShowCreateShift && (
+          <CommandList>
+            <CommandGroup heading="Actions">
+              <CommandItem
+                value="create shift"
+                onSelect={() => {
+                  void onShiftCreatedSuccess?.()
+                }}
+                className="data-[selected=true]:bg-neutral-100 data-[selected=true]:text-neutral-900"
               >
-                Cancel
-              </Button>
-            </div>
-            {shiftActionMessage && (
-              <p className="mt-2 text-xs text-neutral-700">{shiftActionMessage}</p>
-            )}
-          </div>
+                <CalendarIcon className="size-4" />
+                <span>Create Shift</span>
+              </CommandItem>
+            </CommandGroup>
+          </CommandList>
         )}
-        <CommandList>
-          <CommandEmpty>No results found.</CommandEmpty>
-
-          <CommandGroup heading="Actions">
-            <CommandItem
-              value="create shift"
-              onSelect={() => {
-                setShowCreateShiftForm(true)
-                setShiftActionMessage(null)
-              }}
-              className="data-[selected=true]:bg-neutral-100 data-[selected=true]:text-neutral-900"
-            >
-              <CalendarIcon className="size-4" />
-              <span>Create shift</span>
-            </CommandItem>
-          </CommandGroup>
-
-          <CommandSeparator />
-
-          <CommandGroup heading="Offices">
-            {offices.map((office) => (
-              <CommandItem
-                key={office.id}
-                value={office.name}
-                className="data-[selected=true]:bg-neutral-100 data-[selected=true]:text-neutral-900"
-                onMouseEnter={() => setPreviewOffice(office.name)}
-                onFocus={() => setPreviewOffice(office.name)}
-              >
-                <Building2 className="size-4" />
-                <span>{office.name}</span>
-              </CommandItem>
-            ))}
-          </CommandGroup>
-
-          <CommandSeparator />
-
-          <CommandGroup heading="People">
-            {people.map((person) => (
-              <CommandItem
-                key={person}
-                value={person}
-                className="data-[selected=true]:bg-neutral-100 data-[selected=true]:text-neutral-900"
-              >
-                <UserRound className="size-4" />
-                <span>{person}</span>
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        </CommandList>
       </CommandDialog>
-
-      {typeof window !== 'undefined' &&
-        open &&
-        previewOffice &&
-        createPortal(
-          <div className="fixed inset-0 z-80 flex items-center justify-center p-6 pointer-events-none">
-            <div className="pointer-events-auto w-[90vw] max-w-[1120px] overflow-hidden rounded-lg border bg-white shadow-xl">
-              <div className="flex items-center justify-between border-b px-4 py-3">
-                <p className="text-sm font-semibold text-neutral-900">{previewOffice}</p>
-                <div className="w-[210px]">
-                  <Select value={previewDate} onValueChange={setPreviewDate}>
-                    <SelectTrigger className="h-9 w-full rounded-lg border border-gray-300">
-                      <CalendarIcon className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                      <SelectValue placeholder="Select date" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getOfficeDates(staff, recommendations, previewOffice).map((date) => (
-                        <SelectItem key={date} value={date}>
-                          {formatDateLabel(date)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="max-h-[80vh] overflow-y-auto">
-                {previewDate ? (
-                  <MiniSchedulePreview
-                    office={previewOffice}
-                    selectedDate={previewDate}
-                    staff={staff}
-                    recommendations={recommendations}
-                  />
-                ) : (
-                  <p className="px-4 py-6 text-sm text-gray-500">No available dates for this office.</p>
-                )}
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
     </>
   )
 }

@@ -144,7 +144,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header onShiftCreatedSuccess={handleMcpShiftCreatedSuccess} />
+      <Header />
 
       <main className="w-full">
         <Filters
