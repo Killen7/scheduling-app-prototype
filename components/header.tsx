@@ -2,6 +2,7 @@
 
 import { Menu, Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Spotlight } from '@/components/spotlight'
 import {
   Sheet,
   SheetContent,
@@ -49,13 +50,16 @@ export function Header({ onMenuClick }: HeaderProps) {
       </Sheet>
 
       <div className="flex items-center gap-1">
-        <span className="text-lg font-bold tracking-tight text-primary">TeamBuilderAI</span>
+        <span className="text-lg font-bold tracking-tight text-neutral-900">TeamBuilderAI</span>
       </div>
 
-      <Button variant="ghost" size="icon">
-        <Bell className="size-5" />
-        <span className="sr-only">Notifications</span>
-      </Button>
+      <div className="flex items-center gap-2">
+        <Spotlight />
+        <Button variant="ghost" size="icon">
+          <Bell className="size-5" />
+          <span className="sr-only">Notifications</span>
+        </Button>
+      </div>
     </header>
   )
 }

@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react'
 import { Header } from '@/components/header'
 import { Filters } from '@/components/filters'
-import { StaffGroup } from '@/components/staff-group'
 import { loadStaff, loadRecommendations, StaffMember, Recommendation } from '@/lib/storage'
-import { RecommendationsGroup } from '@/components/recommendations-group'
+import { ScheduleGrid } from '@/components/schedule-grid'
+import { getMonthDates, getWeekDates, type ViewMode } from '@/lib/schedule-utils'
 import { Plus } from 'lucide-react'
+import { MCPPlayground } from '@/components/mcp-playground'
 
 export default function Home() {
   const [staff, setStaff] = useState<StaffMember[]>([])
@@ -14,34 +15,46 @@ export default function Home() {
   const [selectedFloor, setSelectedFloor] = useState('2nd Floor')
   const [selectedDate, setSelectedDate] = useState('2026-05-04')
   const [selectedFilter, setSelectedFilter] = useState<string>('all')
+  const [viewMode, setViewMode] = useState<ViewMode>('day')
 
   useEffect(() => {
     setStaff(loadStaff())
     setAllRecommendations(loadRecommendations())
   }, [])
 
+  const dateRange =
+    viewMode === 'day'
+      ? [selectedDate]
+      : viewMode === 'week'
+        ? getWeekDates(selectedDate)
+        : getMonthDates(selectedDate.slice(0, 7))
+
+  const selectedDates = new Set(dateRange)
+
   const recommendations = allRecommendations.filter(
-    (r) => r.location === selectedFloor && r.date === selectedDate
+    (recommendation) =>
+      recommendation.location === selectedFloor &&
+      selectedDates.has(recommendation.date)
   )
 
-  // Filter by floor + date first, then by staff type
-  const byFloorAndDate = staff.filter(
-    (s) => s.location === selectedFloor && s.date === selectedDate
+  const staffByFloorAndRange = staff.filter(
+    (member) =>
+      member.location === selectedFloor &&
+      selectedDates.has(member.date)
   )
 
-  const providers = byFloorAndDate.filter((s) => s.type === 'provider')
-  const nonClinical = byFloorAndDate.filter((s) => s.type === 'non-clinical')
-  const clinical = byFloorAndDate.filter((s) => s.type === 'clinical')
-
-  const visibleProviders   = selectedFilter === 'all' || selectedFilter === 'providers'    ? providers   : []
-  const visibleNonClinical = selectedFilter === 'all' || selectedFilter === 'non-clinical' ? nonClinical : []
-  const visibleClinical    = selectedFilter === 'all' || selectedFilter === 'clinical'     ? clinical    : []
+  const filteredStaff = staffByFloorAndRange.filter((member) => {
+    if (selectedFilter === 'providers') return member.type === 'provider'
+    if (selectedFilter === 'non-clinical') return member.type === 'non-clinical'
+    if (selectedFilter === 'clinical') return member.type === 'clinical'
+    return true
+  })
 
   return (
     <div className="min-h-screen bg-white">
       <Header />
 
-      <main className="mx-auto max-w-2xl">
+      <main className="w-full">
         <Filters
           selectedFloor={selectedFloor}
           onFloorChange={setSelectedFloor}
@@ -49,14 +62,20 @@ export default function Home() {
           onDateChange={setSelectedDate}
           selectedFilter={selectedFilter}
           onFilterChange={setSelectedFilter}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
         />
 
         <div className="space-y-0">
-          <RecommendationsGroup recommendations={recommendations} />
-          <StaffGroup title="PROVIDERS"        members={visibleProviders}   groupType="provider"      />
-          <StaffGroup title="NON-CLINICAL STAFF" members={visibleNonClinical} groupType="non-clinical"  />
-          <StaffGroup title="CLINICAL STAFF"  members={visibleClinical}    groupType="clinical"     />
+          <ScheduleGrid
+            staff={filteredStaff}
+            recommendations={recommendations}
+            viewMode={viewMode}
+            selectedDate={selectedDate}
+          />
         </div>
+
+        <MCPPlayground />
       </main>
 
       {/* Floating Action Button */}
@@ -72,7 +91,7 @@ export default function Home() {
           setStaff([...staff, newStaff])
         }}
         aria-label="Add shift"
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg transition-transform active:scale-95"
+        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-neutral-900 text-white shadow-lg transition-transform active:scale-95"
       >
         <Plus className="h-6 w-6" />
       </button>

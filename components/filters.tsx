@@ -1,6 +1,8 @@
 'use client'
 
 import { CalendarIcon } from 'lucide-react'
+import { ViewSwitcher } from '@/components/view-switcher'
+import type { ViewMode } from '@/lib/schedule-utils'
 import {
   Select,
   SelectContent,
@@ -16,6 +18,8 @@ interface FiltersProps {
   onDateChange: (date: string) => void
   selectedFilter: string
   onFilterChange: (filter: string) => void
+  viewMode: ViewMode
+  onViewModeChange: (mode: ViewMode) => void
 }
 
 const FLOORS = ['1st Floor', '2nd Floor', '3rd Floor']
@@ -44,27 +48,31 @@ export function Filters({
   onDateChange,
   selectedFilter,
   onFilterChange,
+  viewMode,
+  onViewModeChange,
 }: FiltersProps) {
   return (
-    <div className="flex flex-col gap-3 border-b bg-white px-4 py-4">
-      <div className="flex gap-3">
-        {/* Floor Select */}
-        <Select value={selectedFloor} onValueChange={onFloorChange}>
-          <SelectTrigger className="flex-1 rounded-lg border border-gray-300">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {FLOORS.map((floor) => (
-              <SelectItem key={floor} value={floor}>
-                {floor}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+    <div className="border-b bg-white px-4 py-4">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+        <div className="flex items-center gap-4 justify-self-start">
+          <ViewSwitcher value={viewMode} onChange={onViewModeChange} />
 
-        {/* Date Select */}
+          <Select value={selectedFloor} onValueChange={onFloorChange}>
+            <SelectTrigger className="w-[150px] rounded-lg border border-gray-300">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {FLOORS.map((floor) => (
+                <SelectItem key={floor} value={floor}>
+                  {floor}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         <Select value={selectedDate} onValueChange={onDateChange}>
-          <SelectTrigger className="flex-1 rounded-lg border border-gray-300">
+          <SelectTrigger className="w-[190px] rounded-lg border border-gray-300">
             <CalendarIcon className="mr-2 h-4 w-4 shrink-0 opacity-50" />
             <SelectValue>{formatDate(selectedDate)}</SelectValue>
           </SelectTrigger>
@@ -76,20 +84,21 @@ export function Filters({
             ))}
           </SelectContent>
         </Select>
-      </div>
 
-      {/* Filter By */}
-      <Select value={selectedFilter} onValueChange={onFilterChange}>
-        <SelectTrigger className="w-full rounded-lg border border-gray-300">
-          <SelectValue placeholder="Filter by" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Staff</SelectItem>
-          <SelectItem value="providers">Providers Only</SelectItem>
-          <SelectItem value="non-clinical">Non-Clinical Only</SelectItem>
-          <SelectItem value="clinical">Clinical Only</SelectItem>
-        </SelectContent>
-      </Select>
+        <div className="w-[220px] justify-self-end">
+          <Select value={selectedFilter} onValueChange={onFilterChange}>
+            <SelectTrigger className="w-full rounded-lg border border-gray-300">
+              <SelectValue placeholder="Filter by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Staff</SelectItem>
+              <SelectItem value="providers">Providers Only</SelectItem>
+              <SelectItem value="non-clinical">Non-Clinical Only</SelectItem>
+              <SelectItem value="clinical">Clinical Only</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
     </div>
   )
 }

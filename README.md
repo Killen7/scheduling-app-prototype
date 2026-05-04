@@ -24,6 +24,36 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## MCP Example (local test)
+
+This project includes a simple MCP-style JSON-RPC endpoint at `app/api/mcp/route.ts`.
+
+It supports:
+
+- `initialize`
+- `tools/list`
+- `tools/call` with tools `ping` and `get_current_date`
+
+### Quick test with curl
+
+```bash
+curl -s http://localhost:3000/api/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":"1","method":"initialize","params":{"clientInfo":{"name":"curl","version":"0.1.0"}}}'
+```
+
+```bash
+curl -s http://localhost:3000/api/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":"2","method":"tools/list"}'
+```
+
+```bash
+curl -s http://localhost:3000/api/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":"3","method":"tools/call","params":{"name":"ping","arguments":{"message":"hola"}}}'
+```
+
 ## Learn More
 
 To learn more, take a look at the following resources:

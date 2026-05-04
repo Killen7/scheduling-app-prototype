@@ -19,6 +19,24 @@ export function parseTimeToHour(time: string): number {
   return hour
 }
 
+// Parse time string like "8:30 AM" to minutes since midnight
+export function parseTimeToMinutes(time: string): number {
+  const match = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
+  if (!match) return 0
+
+  let hour = parseInt(match[1], 10)
+  const minute = parseInt(match[2], 10)
+  const isPM = match[3].toUpperCase() === 'PM'
+
+  if (hour === 12) {
+    hour = isPM ? 12 : 0
+  } else if (isPM) {
+    hour += 12
+  }
+
+  return hour * 60 + minute
+}
+
 // Parse schedule string like "8:00 AM - 4:00 PM" to start/end hours
 export function parseSchedule(schedule: string): { startHour: number; endHour: number; duration: number } {
   const parts = schedule.split(' - ')
@@ -36,14 +54,35 @@ export function parseSchedule(schedule: string): { startHour: number; endHour: n
   return { startHour, endHour: endHour % 24, duration }
 }
 
+// Parse schedule string to minute-based values
+export function parseScheduleToMinutes(
+  schedule: string
+): { startMinutes: number; endMinutes: number; durationMinutes: number } {
+  const parts = schedule.split(' - ')
+  if (parts.length !== 2) return { startMinutes: 0, endMinutes: 0, durationMinutes: 0 }
+
+  const startMinutes = parseTimeToMinutes(parts[0].trim())
+  let endMinutes = parseTimeToMinutes(parts[1].trim())
+
+  if (endMinutes <= startMinutes) {
+    endMinutes += 24 * 60
+  }
+
+  return {
+    startMinutes,
+    endMinutes: endMinutes % (24 * 60),
+    durationMinutes: endMinutes - startMinutes,
+  }
+}
+
 // Calculate pill position and width for daily view (90px per hour)
 export function getDailyPillStyle(schedule: string): { left: number; width: number } {
-  const { startHour, duration } = parseSchedule(schedule)
+  const { startMinutes, durationMinutes } = parseScheduleToMinutes(schedule)
   const HOUR_WIDTH = 90
   
   return {
-    left: startHour * HOUR_WIDTH,
-    width: Math.max(duration * HOUR_WIDTH, HOUR_WIDTH), // minimum 1 hour width
+    left: (startMinutes / 60) * HOUR_WIDTH,
+    width: Math.max((durationMinutes / 60) * HOUR_WIDTH, HOUR_WIDTH / 2), // minimum 30 minutes width
   }
 }
 
@@ -60,7 +99,7 @@ export function getDailyHours(): number[] {
   return Array.from({ length: 24 }, (_, i) => i)
 }
 
-// Get array of dates for weekly view (Mon-Fri starting from a date)
+// Get array of dates for weekly view (Mon-Sun starting from a date)
 export function getWeekDates(startDate: string): string[] {
   const start = new Date(startDate)
   // Adjust to Monday if not already
@@ -68,7 +107,7 @@ export function getWeekDates(startDate: string): string[] {
   const diff = day === 0 ? -6 : 1 - day
   start.setDate(start.getDate() + diff)
   
-  return Array.from({ length: 5 }, (_, i) => {
+  return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(start)
     d.setDate(start.getDate() + i)
     return d.toISOString().split('T')[0]
